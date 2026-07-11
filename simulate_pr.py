@@ -22,10 +22,9 @@ import hmac
 import json
 
 import httpx
-from github import Github
 
 from app.config import get_settings
-from app.github_client import list_changed_files
+from app.github_client import get_repo, list_changed_files
 
 WEBHOOK_URL = "http://localhost:8000/webhook/github"
 
@@ -48,9 +47,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _build_payload(args: argparse.Namespace) -> dict:
-    settings = get_settings()
-    gh = Github(settings.github_api_token)
-    repo = gh.get_repo(args.full_name)
+    repo = get_repo(args.full_name)
     pr = repo.get_pull(args.pr_number)
 
     modified_files, added_files = list_changed_files(args.full_name, args.pr_number)

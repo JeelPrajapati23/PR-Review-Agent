@@ -1,4 +1,7 @@
-from github import Github, GithubException
+import base64
+from functools import lru_cache
+
+from github import Auth, Github, GithubException, GithubIntegration
 
 from app.config import get_settings
 
@@ -9,11 +12,47 @@ _MAX_STATUS_DESCRIPTION = 140
 
 
 class GitHubNotifyError(RuntimeError):
-    """Raised when the GitHub API rejects a status update or review comment."""
+    """Raised when the GitHub App's installation token can't be resolved, or
+    the GitHub API rejects a status update or review comment."""
 
 
-def _repo(full_name: str):
-    return Github(get_settings().github_api_token).get_repo(full_name)
+def _app_auth() -> Auth.AppAuth:
+    settings = get_settings()
+    private_key = base64.b64decode(settings.github_app_private_key_b64).decode()
+    return Auth.AppAuth(settings.github_app_id, private_key)
+
+
+@lru_cache
+def _installation_auth(full_name: str) -> Auth.AppInstallationAuth:
+    """Self-refreshing per-repo installation auth, cached for the process
+    lifetime (same lru_cache pattern as config.get_settings()) so repeated
+    API calls against the same repo within one review don't each re-resolve
+    the installation -- AppInstallationAuth itself handles token refresh
+    transparently on every request.
+    """
+    owner, repo = full_name.split("/", 1)
+    app_auth = _app_auth()
+    installation = GithubIntegration(auth=app_auth).get_repo_installation(owner, repo)
+    return app_auth.get_installation_auth(installation.id)
+
+
+def get_repo(full_name: str):
+    return Github(auth=_installation_auth(full_name)).get_repo(full_name)
+
+
+def get_installation_token(full_name: str) -> str:
+    """A raw installation access token string for full_name, for callers that
+    can't use a PyGithub Github(auth=...) client -- namely app/git_ops.py,
+    which needs the token as text for git's own HTTP Authorization header.
+    Resolved fresh on every call (checkouts happen once per review, so the
+    extra API round-trip is negligible) rather than cached, since a raw
+    string -- unlike AppInstallationAuth -- doesn't self-refresh.
+    """
+    owner, repo = full_name.split("/", 1)
+    app_auth = _app_auth()
+    integration = GithubIntegration(auth=app_auth)
+    installation = integration.get_repo_installation(owner, repo)
+    return integration.get_access_token(installation.id).token
 
 
 def set_commit_status(full_name: str, sha: str, state: str, description: str) -> None:
@@ -21,7 +60,7 @@ def set_commit_status(full_name: str, sha: str, state: str, description: str) ->
     states: 'pending', 'success', 'failure', 'error'.
     """
     try:
-        commit = _repo(full_name).get_commit(sha)
+        commit = get_repo(full_name).get_commit(sha)
         commit.create_status(
             state=state,
             description=description[:_MAX_STATUS_DESCRIPTION],
@@ -48,9 +87,9 @@ def post_review(
     comments is non-empty.
     """
     try:
-        pr = _repo(full_name).get_pull(pr_number)
+        pr = get_repo(full_name).get_pull(pr_number)
         if comments:
-            commit = _repo(full_name).get_commit(sha)
+            commit = get_repo(full_name).get_commit(sha)
             pr.create_review(commit=commit, body=body, event="COMMENT", comments=comments)
         else:
             pr.create_review(body=body, event="COMMENT")
@@ -66,7 +105,7 @@ def list_changed_files(full_name: str, pr_number: int) -> tuple[list[str], list[
     GitHub only exposes changed files via this separate "list PR files" API.
     """
     try:
-        pr = _repo(full_name).get_pull(pr_number)
+        pr = get_repo(full_name).get_pull(pr_number)
         modified_files = []
         added_files = []
         for f in pr.get_files():

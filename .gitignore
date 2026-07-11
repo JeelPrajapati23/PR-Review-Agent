@@ -6,3 +6,5 @@ venv/
 .pytest_cache/
 app/workspace/
 .azure_deploy_tmp/
+*.pem
+webhook_secret.txt

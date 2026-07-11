@@ -29,7 +29,7 @@ TEST_INNER_TIMEOUT_SECONDS = 15
 # function (confirmed empirically: a real pytest run against a real test
 # file, from a process holding only these vars, collects/executes/passes
 # normally). Every secret this worker process holds -- GROQ_API_KEY,
-# GITHUB_API_TOKEN, REDIS_URL, GITHUB_WEBHOOK_SECRET, CELERY_BROKER_URL --
+# GITHUB_APP_PRIVATE_KEY_B64, REDIS_URL, GITHUB_WEBHOOK_SECRET, CELERY_BROKER_URL --
 # is deliberately absent, so malicious test code can't read them via
 # os.environ and echo them into this tool's stdout/stderr, which would
 # otherwise flow straight into the LLM's context and potentially into a

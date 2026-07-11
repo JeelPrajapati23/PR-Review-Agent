@@ -5,6 +5,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from app.config import get_settings
+from app.github_client import get_installation_token
 
 logger = logging.getLogger(__name__)
 
@@ -79,10 +80,13 @@ def ensure_repo_checkout(clone_url: str, full_name: str, branch: str) -> Path:
 
     # Sent on every clone/fetch, public or private repos alike -- same
     # default posture as GitHub Actions' own actions/checkout. A plain,
-    # unauthenticated clone_url has no way to access a private repo at all
-    # (only app/github_client.py's REST calls were authenticated before this),
+    # unauthenticated clone_url has no way to access a private repo at all,
     # and authenticating unconditionally avoids a public/private special case.
-    auth_config = [_auth_extra_header_config(clone_url, get_settings().github_api_token)]
+    # get_installation_token resolves a fresh, short-lived GitHub App
+    # installation token -- git's x-access-token:<token> basic-auth format
+    # accepts either a classic PAT or an installation token identically, so
+    # this is a drop-in replacement for the old static PAT.
+    auth_config = [_auth_extra_header_config(clone_url, get_installation_token(full_name))]
 
     if not (target / ".git").is_dir():
         logger.info("No local checkout for %s, cloning into %s", full_name, target)

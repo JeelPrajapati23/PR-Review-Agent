@@ -3,7 +3,8 @@ from unittest.mock import patch
 
 os.environ.setdefault("GITHUB_WEBHOOK_SECRET", "test-secret")
 os.environ.setdefault("GROQ_API_KEY", "test-key")
-os.environ.setdefault("GITHUB_API_TOKEN", "test-token")
+os.environ.setdefault("GITHUB_APP_ID", "123456")
+os.environ.setdefault("GITHUB_APP_PRIVATE_KEY_B64", "dGVzdC1rZXk=")
 
 from app.tasks import _CommitStatusOnFailureTask, process_pr_review_task
 
