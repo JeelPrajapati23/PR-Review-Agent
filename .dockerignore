@@ -1,0 +1,35 @@
+# Secrets: never let these enter the build context, even though the
+# Dockerfile doesn't COPY them -- `docker build` uploads the whole context to
+# the daemon before any COPY filtering happens, and a stray `COPY . .` added
+# later would otherwise bake a real .env straight into an image layer.
+.env
+.env.*
+!.env.example
+
+.git/
+.venv/
+venv/
+# Docker's dockerignore matching, unlike .gitignore, does NOT treat a bare
+# "dirname/" as matching at every depth -- confirmed directly: without the
+# "**/" prefix, mcp_servers/__pycache__ (an existing local artifact from
+# running pytest) still made it into a build's COPY mcp_servers layer.
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+
+# Dev-only pieces (see CLAUDE.md: only app/ and mcp_servers/ are the runtime
+# pieces) -- excluded so they never end up in the build context or, if the
+# Dockerfile's COPY lines ever change, an image layer.
+tests/
+evaluation/
+simulate_pr.py
+README.md
+CLAUDE.md
+
+# Checked-out PR repos from local/manual runs -- large, and never something
+# a fresh container build should ship with.
+app/workspace/
+
+Dockerfile
+docker-compose.yml
+.dockerignore

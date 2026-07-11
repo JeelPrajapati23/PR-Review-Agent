@@ -1,0 +1,169 @@
+{
+  "rows": [
+    {
+      "id": "sec-01-sql-injection",
+      "category": "security",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identified the SQL injection vulnerability in the find_user_by_username function in user_repository.py and suggested using a parameterized query, matching the ground truth precisely. The finding was appropriately placed under 'Security & Correctness Issues' and treated with a high level of concern, consistent with its severity. No false positives were introduced."
+      }
+    },
+    {
+      "id": "sec-02-command-injection",
+      "category": "security",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review accurately identifies the command injection vulnerability in `compress_directory()` due to `shell=True` and places it in the correct \"Security & Correctness Issues\" section. The severity is appropriately conveyed as a direct vulnerability."
+      }
+    },
+    {
+      "id": "sec-03-hardcoded-secret",
+      "category": "security",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identified both the hardcoded API key and the logging of card numbers in `src/payment_client.py`, placing them under 'Security & Correctness Issues'. The treatment of these issues as 'security risks' aligns with the high severity ground truth. No false positive findings were detailed in the review."
+      }
+    },
+    {
+      "id": "sec-04-insecure-deserialization",
+      "category": "security",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 1,
+        "reasoning": "The review accurately identifies the insecure use of the pickle module in cache_layer.py, explicitly mentioning the risk of arbitrary code execution from untrusted data, which matches the ground truth's high-severity security issue. It correctly places this finding under 'Security & Correctness Issues' and conveys appropriate severity. However, it includes a false positive claim about 'potential performance issues due to the lack of protocol version specification' in the summary, which is not part of the ground truth."
+      }
+    },
+    {
+      "id": "sec-05-path-traversal",
+      "category": "security",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identifies the path traversal vulnerability in `read_user_file()` within `src/file_server.py`, matching the ground truth. It places the finding under the appropriate \"Security & Correctness Issues\" section, and the description of the vulnerability's impact aligns with a high severity issue. No false positives were found."
+      }
+    },
+    {
+      "id": "perf-01-quadratic-duplicate-check",
+      "category": "performance",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identified the O(n^2) performance issue in dedupe.py, suggesting the O(n) set-based solution. It placed this finding appropriately under 'Performance Observations' and treated it with a suitable level of concern for a medium-severity issue. No false positives were introduced."
+      }
+    },
+    {
+      "id": "perf-02-off-by-one-pagination",
+      "category": "performance",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": false,
+        "severity_matched": true,
+        "false_positive_count": 1,
+        "reasoning": "The review correctly identifies the 'off-by-one error in the end index calculation' in pagination.py. However, it incorrectly places this issue under 'Architectural Suggestions' and states 'Performance Observations: None found', despite the ground truth category being performance. The review also incorrectly claims a lack of input validation for page_number and page_size being less than 1, which the code actually handles by defaulting."
+      }
+    },
+    {
+      "id": "perf-03-exponential-fibonacci",
+      "category": "performance",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identified the exponential time complexity of the fibonacci function and suggested memoization, matching the ground truth. It was appropriately placed under 'Performance Observations' and treated with a suitable level of concern for a medium severity issue. No false positives were found."
+      }
+    },
+    {
+      "id": "perf-04-faulty-memoization-key",
+      "category": "performance",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review accurately identifies the cache key issue in src/pricing_cache.py, stating that base_price is ignored, leading to incorrect results. It correctly places this under 'Security & Correctness Issues' and the language used ('incorrect results', 'stale results') reflects the high severity. No false positives were present."
+      }
+    },
+    {
+      "id": "perf-05-race-condition-counter",
+      "category": "performance",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": false,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identified the race condition and lack of thread-safety in request_counter.py, matching the ground truth issue and its medium severity. However, it incorrectly placed this performance-related issue under 'Security & Correctness Issues' instead of 'Performance Observations'."
+      }
+    },
+    {
+      "id": "struct-01-duplicated-validation-logic",
+      "category": "structural",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identified the duplicated validation logic in `validate_email_signup` and `validate_email_login` and suggested combining them into a single function, matching the ground truth. This structural issue was appropriately placed under 'Architectural Suggestions' and treated with a low severity, consistent with the ground truth."
+      }
+    },
+    {
+      "id": "struct-02-magic-numbers-naming",
+      "category": "structural",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 1,
+        "reasoning": "The review correctly identified the magic numbers and cryptic function name in `calc()` in `checkout_pricing.py` under 'Architectural Suggestions', matching the ground truth's low severity and structural category. However, it introduced a false positive regarding missing test coverage for a 'bulk discount threshold' which was not part of the ground truth issue."
+      }
+    },
+    {
+      "id": "struct-03-silent-exception-handling",
+      "category": "structural",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identifies the bare 'except' clause and its silent swallowing of exceptions, including the inconsistency with logging instead of printing. It places this under 'Security & Correctness Issues' and 'Architectural Suggestions', which are appropriate for a structural issue of medium severity. The suggested solutions (logging, explicit return None) are directly related to fixing the identified problem."
+      }
+    },
+    {
+      "id": "struct-04-deep-nesting-guard-clauses",
+      "category": "structural",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 2,
+        "reasoning": "The review correctly identified the deeply nested if-else structure in 'validate_order' and suggested simplification, aligning with the ground truth's low-severity structural issue. This finding was appropriately placed under 'Architectural Suggestions'. However, the review also raised two additional issues (unclear error messages and missing type checks) that were not part of the ground truth and cannot be verified as actual problems in the context of this evaluation."
+      }
+    },
+    {
+      "id": "struct-05-mixed-logging-dead-code",
+      "category": "structural",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": false,
+        "false_positive_count": 1,
+        "reasoning": "The review correctly identified the presence of `print()` debugging statements and the need for consistent logging, which is part of the ground truth issue. It placed this under 'Architectural Suggestions' which is appropriate for a structural issue. However, it failed to identify the 'dead code' (commented-out block) and incorrectly claimed the prints were 'leaking sensitive customer information,' which is not stated in the ground truth and elevates the severity beyond the intended 'low'."
+      }
+    }
+  ]
+}

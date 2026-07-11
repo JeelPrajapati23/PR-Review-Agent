@@ -1,0 +1,23 @@
+{
+  "id": "perf-05-race-condition-counter",
+  "category": "performance",
+  "target_specialist": "performance_architect",
+  "expected_findings": {
+    "must_flag_file": "request_counter.py",
+    "issue_keywords": [
+      "race condition",
+      "thread-safe",
+      "lock",
+      "concurren"
+    ],
+    "severity": "medium"
+  },
+  "reviewed_at_utc": "2026-07-11T10:36:50.333638+00:00",
+  "wall_clock_seconds": 131.3,
+  "agent_result": {
+    "repository": "octocat/gitops-eval-fixture",
+    "pr_number": 900010,
+    "status": "completed",
+    "summary": "## Summary\nThe code in src/request_counter.py is not thread-safe and may cause a race condition when multiple threads try to increment or decrement the count simultaneously.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nNone found.\n\n## Security & Correctness Issues\nThe code in src/request_counter.py is not thread-safe and may cause a race condition when multiple threads try to increment or decrement the count simultaneously.\n\n## Architectural Suggestions\nNone found.\n\n## Validation Outcome\nNone found."
+  }
+}

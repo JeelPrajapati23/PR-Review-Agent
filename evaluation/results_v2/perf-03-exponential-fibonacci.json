@@ -1,0 +1,23 @@
+{
+  "id": "perf-03-exponential-fibonacci",
+  "category": "performance",
+  "target_specialist": "performance_architect",
+  "expected_findings": {
+    "must_flag_file": "fibonacci.py",
+    "issue_keywords": [
+      "exponential",
+      "memoiz",
+      "recursion",
+      "o(2^n)"
+    ],
+    "severity": "medium"
+  },
+  "reviewed_at_utc": "2026-07-11T10:26:47.046381+00:00",
+  "wall_clock_seconds": 148.3,
+  "agent_result": {
+    "repository": "octocat/gitops-eval-fixture",
+    "pr_number": 900008,
+    "status": "completed",
+    "summary": "## Summary\nThe code review found an exponential time complexity issue in the fibonacci function in src/fibonacci.py. The function can be optimized using memoization to store previously computed Fibonacci numbers.\n\n## Performance Observations\nThe fibonacci function in src/fibonacci.py has an exponential time complexity due to repeated computation of the same subproblems. It can be optimized using memoization.\n\n## Edge Cases\nNone found.\n\n## Security & Correctness Issues\nNone found.\n\n## Architectural Suggestions\nNone found.\n\n## Validation Outcome\nNone found."
+  }
+}

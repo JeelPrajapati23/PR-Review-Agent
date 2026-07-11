@@ -1,0 +1,23 @@
+{
+  "id": "struct-01-duplicated-validation-logic",
+  "category": "structural",
+  "target_specialist": "synthesizer_general",
+  "expected_findings": {
+    "must_flag_file": "signup_validation.py",
+    "issue_keywords": [
+      "duplicat",
+      "extract",
+      "shared helper",
+      "dry"
+    ],
+    "severity": "low"
+  },
+  "reviewed_at_utc": "2026-07-10T11:21:20.570719+00:00",
+  "wall_clock_seconds": 150.2,
+  "agent_result": {
+    "repository": "octocat/gitops-eval-fixture",
+    "pr_number": 900011,
+    "status": "completed",
+    "summary": "## Summary\nThe code review panel reviewed the src/signup_validation.py and tests/test_signup_validation.py files, finding duplicated code in the validate_email_signup and validate_email_login functions.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nNone found.\n\n## Security & Correctness Issues\nNone found.\n\n## Architectural Suggestions\nNone found.\n\n## Validation Outcome\nNone found."
+  }
+}

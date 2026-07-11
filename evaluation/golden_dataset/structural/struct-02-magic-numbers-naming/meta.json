@@ -1,0 +1,19 @@
+{
+  "id": "struct-02-magic-numbers-naming",
+  "category": "structural",
+  "target_specialist": "synthesizer_general",
+  "pr_title": "Add checkout total calculation",
+  "pr_description": "Adds calc() to compute the final checkout total, including tax and a bulk-order discount.",
+  "added_files": [
+    "src/checkout_pricing.py",
+    "tests/test_checkout_pricing.py"
+  ],
+  "modified_files": [],
+  "injected_issue": "calc() uses a cryptic function name and single-letter parameters/locals (a, b, c, x1, x2) plus unexplained magic numbers (0.925, 1.13, 42, 5) with no named constants or comments -- a readability/maintainability smell, not a functional bug.",
+  "expected_findings": {
+    "must_flag_file": "checkout_pricing.py",
+    "issue_keywords": ["magic number", "naming", "readability", "named constant"],
+    "severity": "low"
+  },
+  "why_tests_dont_catch_it": "Both tests assert against the same arithmetic expression duplicated inline, so they pass regardless of how unreadable the implementation is -- correctness isn't in question, clarity is."
+}

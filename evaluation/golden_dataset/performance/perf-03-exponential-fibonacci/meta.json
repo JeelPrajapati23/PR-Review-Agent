@@ -1,0 +1,19 @@
+{
+  "id": "perf-03-exponential-fibonacci",
+  "category": "performance",
+  "target_specialist": "performance_architect",
+  "pr_title": "Add Fibonacci helper for the pricing-tier lookup table",
+  "pr_description": "Adds fibonacci() to compute the n-th Fibonacci number used to derive pricing-tier thresholds.",
+  "added_files": [
+    "src/fibonacci.py",
+    "tests/test_fibonacci.py"
+  ],
+  "modified_files": [],
+  "injected_issue": "fibonacci() is naive double recursion with no memoization, giving O(2^n) time complexity -- fine for n=5 or n=10 but catastrophic (and eventually recursion-limit-breaking) for the larger n values a pricing-tier table would realistically need.",
+  "expected_findings": {
+    "must_flag_file": "fibonacci.py",
+    "issue_keywords": ["exponential", "memoiz", "recursion", "o(2^n)"],
+    "severity": "medium"
+  },
+  "why_tests_dont_catch_it": "Both tests only call fibonacci() with n<=10, which returns instantly even with exponential complexity, so no test times out or reveals the blow-up at realistic n."
+}

@@ -1,0 +1,23 @@
+{
+  "id": "perf-02-off-by-one-pagination",
+  "category": "performance",
+  "target_specialist": "performance_architect",
+  "expected_findings": {
+    "must_flag_file": "pagination.py",
+    "issue_keywords": [
+      "off-by-one",
+      "off by one",
+      "boundary",
+      "dropped item"
+    ],
+    "severity": "medium"
+  },
+  "reviewed_at_utc": "2026-07-10T10:51:08.621453+00:00",
+  "wall_clock_seconds": 111.7,
+  "agent_result": {
+    "repository": "octocat/gitops-eval-fixture",
+    "pr_number": 900007,
+    "status": "completed",
+    "summary": "## Summary\nThe get_page function in src/pagination.py has issues with the end index and handling edge cases.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nIn src/pagination.py, the get_page function does not handle cases where the end index exceeds the length of the list, potentially leading to an IndexError.\n\n## Security & Correctness Issues\nNone found.\n\n## Architectural Suggestions\nNone found.\n\n## Validation Outcome\nNone found."
+  }
+}

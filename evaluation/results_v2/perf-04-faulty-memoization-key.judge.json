@@ -1,0 +1,15 @@
+{
+  "id": "perf-04-faulty-memoization-key",
+  "category": "performance",
+  "judged_at_utc": "2026-07-11T11:07:19.978770+00:00",
+  "wall_clock_seconds": 5.4,
+  "judge_model": "gemini-2.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review accurately identifies the cache key issue in src/pricing_cache.py, stating that base_price is ignored, leading to incorrect results. It correctly places this under 'Security & Correctness Issues' and the language used ('incorrect results', 'stale results') reflects the high severity. No false positives were present."
+  }
+}

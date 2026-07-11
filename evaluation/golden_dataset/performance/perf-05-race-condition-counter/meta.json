@@ -1,0 +1,19 @@
+{
+  "id": "perf-05-race-condition-counter",
+  "category": "performance",
+  "target_specialist": "performance_architect",
+  "pr_title": "Track in-flight request counts per API key for the rate limiter",
+  "pr_description": "Adds increment()/decrement() helpers so the rate limiter can track how many requests are currently in flight per API key.",
+  "added_files": [
+    "src/request_counter.py",
+    "tests/test_request_counter.py"
+  ],
+  "modified_files": [],
+  "injected_issue": "increment()/decrement() perform an unsynchronized read-modify-write (get, add/subtract, set) on a shared dict, which is a classic check-then-act race condition -- concurrent callers (this is a rate limiter, called from many request-handling threads) can interleave and lose updates.",
+  "expected_findings": {
+    "must_flag_file": "request_counter.py",
+    "issue_keywords": ["race condition", "thread-safe", "lock", "concurren"],
+    "severity": "medium"
+  },
+  "why_tests_dont_catch_it": "All three tests call increment()/decrement() sequentially from a single thread, so the read-modify-write is never actually interleaved and the missing lock never produces a wrong count."
+}

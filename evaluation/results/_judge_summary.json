@@ -1,0 +1,169 @@
+{
+  "rows": [
+    {
+      "id": "sec-01-sql-injection",
+      "category": "security",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identifies the SQL injection vulnerability in the find_user_by_username function of user_repository.py. It places this finding in the 'Security & Correctness Issues' section and does not introduce any false positives."
+      }
+    },
+    {
+      "id": "sec-02-command-injection",
+      "category": "security",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identifies the command injection vulnerability in src/archive_tool.py caused by using shell=True with subprocess.run(). It places this finding in the correct section (Security & Correctness Issues) and does not introduce any false positives."
+      }
+    },
+    {
+      "id": "sec-03-hardcoded-secret",
+      "category": "security",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identified the hardcoded API key as a security risk and placed it in the appropriate section. However, it missed the second part of the ground truth issue, which was the logging of sensitive data (raw card number and API key) at INFO level."
+      }
+    },
+    {
+      "id": "sec-04-insecure-deserialization",
+      "category": "security",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 1,
+        "reasoning": "The review correctly identified the insecure deserialization vulnerability in `cache_layer.py` due to `pickle`'s ability to execute arbitrary code, placing it appropriately under 'Security & Correctness Issues' with a suitable level of concern. However, it included one false positive regarding the `pickle.dump` protocol version, which is not the ground truth issue and is incorrectly framed as a 'potential security vulnerability' in this context."
+      }
+    },
+    {
+      "id": "sec-05-path-traversal",
+      "category": "security",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identified the path traversal vulnerability in `read_user_file()` within `src/file_server.py`. It placed this high-severity security issue in the appropriate 'Security & Correctness Issues' section, and there were no false positives."
+      }
+    },
+    {
+      "id": "perf-01-quadratic-duplicate-check",
+      "category": "performance",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identified the O(n^2) complexity in dedupe.py due to nested loops and suggested the O(n) set-based improvement, matching the ground truth precisely. The finding was placed in the appropriate 'Performance Observations' section and its treatment aligns with a medium severity issue. No false positives were introduced."
+      }
+    },
+    {
+      "id": "perf-02-off-by-one-pagination",
+      "category": "performance",
+      "verdict": {
+        "true_positive_caught": false,
+        "section_correct": false,
+        "severity_matched": false,
+        "false_positive_count": 1,
+        "reasoning": "The review failed to identify the ground truth off-by-one error where the calculated end index causes items to be dropped. Instead, it raised a false positive about an IndexError if the end index exceeds the list length, which Python slicing handles gracefully without error. The ground truth issue was also categorized as 'performance', but the review explicitly stated 'None found' in that section."
+      }
+    },
+    {
+      "id": "perf-03-exponential-fibonacci",
+      "category": "performance",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identifies the exponential time complexity of the fibonacci function due to repeated computations and suggests memoization, directly matching the ground truth. This performance issue is appropriately placed under 'Performance Observations' and 'Architectural Suggestions', and its treatment aligns with a medium severity concern. No false positives were found."
+      }
+    },
+    {
+      "id": "perf-04-faulty-memoization-key",
+      "category": "performance",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review accurately identifies that the memoization key in pricing_cache.py ignores the base price, leading to incorrect results, which perfectly matches the ground truth. The issue is correctly categorized under 'Security & Correctness Issues' given its impact on correctness, and the description conveys a high severity problem."
+      }
+    },
+    {
+      "id": "perf-05-race-condition-counter",
+      "category": "performance",
+      "verdict": {
+        "true_positive_caught": false,
+        "section_correct": false,
+        "severity_matched": false,
+        "false_positive_count": 1,
+        "reasoning": "The review failed to identify the ground-truth race condition in `request_counter.py`, stating 'None found' under 'Performance Observations'. Instead, it raised a different, unrelated concern about a potential KeyError if an API key is not present, which counts as a false positive against the specific ground truth."
+      }
+    },
+    {
+      "id": "struct-01-duplicated-validation-logic",
+      "category": "structural",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": false,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identifies the duplicated code in the specified functions within its summary. However, it fails to place this structural issue into an appropriate dedicated section like 'Architectural Suggestions'. The mention in the summary aligns with the low severity of the issue."
+      }
+    },
+    {
+      "id": "struct-02-magic-numbers-naming",
+      "category": "structural",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identified the magic numbers in the `calc()` function and suggested replacing them with named constants for readability and maintainability, which directly addresses the core of the ground truth issue. This was appropriately categorized under 'Architectural Suggestions' and treated as a low-severity improvement, matching the ground truth."
+      }
+    },
+    {
+      "id": "struct-03-silent-exception-handling",
+      "category": "structural",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 1,
+        "reasoning": "The review correctly identified the bare 'except' clause in src/import_job.py and its potential to catch unintended exceptions, aligning with the ground truth's core issue and severity. It placed this finding appropriately under 'Security & Correctness Issues'. However, it also raised an unverified concern about test coverage in tests/test_import_job.py which is not part of the ground truth."
+      }
+    },
+    {
+      "id": "struct-04-deep-nesting-guard-clauses",
+      "category": "structural",
+      "verdict": {
+        "true_positive_caught": false,
+        "section_correct": false,
+        "severity_matched": false,
+        "false_positive_count": 0,
+        "reasoning": "The review completely missed the ground-truth issue regarding the six levels of nested if/else statements and the suggestion for early-return guard clauses. Instead, it focused on missing validation checks for empty/None values and data types, which are different concerns. Without the code, it's not possible to determine if these other issues are false positives."
+      }
+    },
+    {
+      "id": "struct-05-mixed-logging-dead-code",
+      "category": "structural",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": false,
+        "severity_matched": true,
+        "false_positive_count": 2,
+        "reasoning": "The review correctly identifies 'leftover debug prints' from the ground truth, which matches the low severity. However, it fails to mention the 'dead code' aspect and places the finding only in the summary, not a dedicated section. It also includes two false positives: 'inadequate email validation' and 'lack of logging for notification messages'."
+      }
+    }
+  ]
+}

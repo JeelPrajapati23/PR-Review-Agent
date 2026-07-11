@@ -1,0 +1,23 @@
+{
+  "id": "struct-02-magic-numbers-naming",
+  "category": "structural",
+  "target_specialist": "synthesizer_general",
+  "expected_findings": {
+    "must_flag_file": "checkout_pricing.py",
+    "issue_keywords": [
+      "magic number",
+      "naming",
+      "readability",
+      "named constant"
+    ],
+    "severity": "low"
+  },
+  "reviewed_at_utc": "2026-07-10T11:23:50.764788+00:00",
+  "wall_clock_seconds": 129.3,
+  "agent_result": {
+    "repository": "octocat/gitops-eval-fixture",
+    "pr_number": 900012,
+    "status": "completed",
+    "summary": "## Summary\nThe code review panel reviewed the src/checkout_pricing.py file and found several areas for improvement, including the use of magic numbers and the need for more comprehensive test cases.\n\n## Performance Observations\nThe function calc() in src/checkout_pricing.py applies a 7.5% discount and a 13% tax, but these percentages are magic numbers and should be defined as constants for better readability and maintainability. Additionally, the function applies a $5 discount for bulk orders, but the threshold and discount amount are also magic numbers.\n\n## Edge Cases\nThe test cases in tests/test_checkout_pricing.py should cover different scenarios, including edge cases, to ensure the function is working as expected.\n\n## Security & Correctness Issues\nNone found.\n\n## Architectural Suggestions\nThe magic numbers in src/checkout_pricing.py should be replaced with named constants to improve code readability.\n\n## Validation Outcome\nNone found."
+  }
+}

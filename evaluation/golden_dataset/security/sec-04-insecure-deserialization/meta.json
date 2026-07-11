@@ -1,0 +1,19 @@
+{
+  "id": "sec-04-insecure-deserialization",
+  "category": "security",
+  "target_specialist": "security_warden",
+  "pr_title": "Add on-disk object cache for report-generation jobs",
+  "pr_description": "Adds a small cache layer so expensive report objects can be persisted to disk and reloaded across job runs.",
+  "added_files": [
+    "src/cache_layer.py",
+    "tests/test_cache_layer.py"
+  ],
+  "modified_files": [],
+  "injected_issue": "load_cached_object() deserializes cache files with pickle.load, which executes arbitrary code on load; the cache_dir is documented as potentially a shared upload directory, so an attacker who can drop a file there gains code execution.",
+  "expected_findings": {
+    "must_flag_file": "cache_layer.py",
+    "issue_keywords": ["pickle", "insecure deserialization", "arbitrary code execution", "untrusted"],
+    "severity": "high"
+  },
+  "why_tests_dont_catch_it": "The round-trip test only ever loads a file that save_cached_object() itself just wrote in the same process, so it never simulates loading a file from an untrusted source."
+}

@@ -1,0 +1,15 @@
+{
+  "id": "struct-04-deep-nesting-guard-clauses",
+  "category": "structural",
+  "judged_at_utc": "2026-07-11T11:09:07.500175+00:00",
+  "wall_clock_seconds": 12.4,
+  "judge_model": "gemini-2.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 2,
+    "reasoning": "The review correctly identified the deeply nested if-else structure in 'validate_order' and suggested simplification, aligning with the ground truth's low-severity structural issue. This finding was appropriately placed under 'Architectural Suggestions'. However, the review also raised two additional issues (unclear error messages and missing type checks) that were not part of the ground truth and cannot be verified as actual problems in the context of this evaluation."
+  }
+}

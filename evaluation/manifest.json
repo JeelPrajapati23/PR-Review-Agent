@@ -1,0 +1,130 @@
+{
+  "description": "Golden dataset of 15 synthetic PR fixtures for evaluating the review panel's output quality. Each entry's `path` is relative to evaluation/golden_dataset/ and is a self-contained mini-repo (src/ + tests/ + meta.json + conftest.py) that can be reviewed directly via app.agent.run_pr_review_agent, the same way tests/test_integration.py drives a real fixture.",
+  "categories": {
+    "security": "Targets the Security Warden specialist -- data leaks, injection, dependency/deserialization risk, OWASP-style vulnerabilities.",
+    "performance": "Targets the Performance & Logic Architect specialist -- algorithmic complexity, correctness/edge-case regressions, concurrency control-flow bugs.",
+    "structural": "Targets the Synthesizer / general-quality pass -- duplication, naming, dead code, exception-handling hygiene, nesting -- lower severity, no functional break."
+  },
+  "entries": [
+    {
+      "id": "sec-01-sql-injection",
+      "category": "security",
+      "target_specialist": "security_warden",
+      "path": "security/sec-01-sql-injection",
+      "added_files": ["src/user_repository.py", "tests/test_user_repository.py"],
+      "severity": "high"
+    },
+    {
+      "id": "sec-02-command-injection",
+      "category": "security",
+      "target_specialist": "security_warden",
+      "path": "security/sec-02-command-injection",
+      "added_files": ["src/archive_tool.py", "tests/test_archive_tool.py"],
+      "severity": "high"
+    },
+    {
+      "id": "sec-03-hardcoded-secret",
+      "category": "security",
+      "target_specialist": "security_warden",
+      "path": "security/sec-03-hardcoded-secret",
+      "added_files": ["src/payment_client.py", "tests/test_payment_client.py"],
+      "severity": "high"
+    },
+    {
+      "id": "sec-04-insecure-deserialization",
+      "category": "security",
+      "target_specialist": "security_warden",
+      "path": "security/sec-04-insecure-deserialization",
+      "added_files": ["src/cache_layer.py", "tests/test_cache_layer.py"],
+      "severity": "high"
+    },
+    {
+      "id": "sec-05-path-traversal",
+      "category": "security",
+      "target_specialist": "security_warden",
+      "path": "security/sec-05-path-traversal",
+      "added_files": ["src/file_server.py", "tests/test_file_server.py"],
+      "severity": "high"
+    },
+    {
+      "id": "perf-01-quadratic-duplicate-check",
+      "category": "performance",
+      "target_specialist": "performance_architect",
+      "path": "performance/perf-01-quadratic-duplicate-check",
+      "added_files": ["src/dedupe.py", "tests/test_dedupe.py"],
+      "severity": "medium"
+    },
+    {
+      "id": "perf-02-off-by-one-pagination",
+      "category": "performance",
+      "target_specialist": "performance_architect",
+      "path": "performance/perf-02-off-by-one-pagination",
+      "added_files": ["src/pagination.py", "tests/test_pagination.py"],
+      "severity": "medium"
+    },
+    {
+      "id": "perf-03-exponential-fibonacci",
+      "category": "performance",
+      "target_specialist": "performance_architect",
+      "path": "performance/perf-03-exponential-fibonacci",
+      "added_files": ["src/fibonacci.py", "tests/test_fibonacci.py"],
+      "severity": "medium"
+    },
+    {
+      "id": "perf-04-faulty-memoization-key",
+      "category": "performance",
+      "target_specialist": "performance_architect",
+      "path": "performance/perf-04-faulty-memoization-key",
+      "added_files": ["src/pricing_cache.py", "tests/test_pricing_cache.py"],
+      "severity": "high"
+    },
+    {
+      "id": "perf-05-race-condition-counter",
+      "category": "performance",
+      "target_specialist": "performance_architect",
+      "path": "performance/perf-05-race-condition-counter",
+      "added_files": ["src/request_counter.py", "tests/test_request_counter.py"],
+      "severity": "medium"
+    },
+    {
+      "id": "struct-01-duplicated-validation-logic",
+      "category": "structural",
+      "target_specialist": "synthesizer_general",
+      "path": "structural/struct-01-duplicated-validation-logic",
+      "added_files": ["src/signup_validation.py", "tests/test_signup_validation.py"],
+      "severity": "low"
+    },
+    {
+      "id": "struct-02-magic-numbers-naming",
+      "category": "structural",
+      "target_specialist": "synthesizer_general",
+      "path": "structural/struct-02-magic-numbers-naming",
+      "added_files": ["src/checkout_pricing.py", "tests/test_checkout_pricing.py"],
+      "severity": "low"
+    },
+    {
+      "id": "struct-03-silent-exception-handling",
+      "category": "structural",
+      "target_specialist": "synthesizer_general",
+      "path": "structural/struct-03-silent-exception-handling",
+      "added_files": ["src/import_job.py", "tests/test_import_job.py"],
+      "severity": "medium"
+    },
+    {
+      "id": "struct-04-deep-nesting-guard-clauses",
+      "category": "structural",
+      "target_specialist": "synthesizer_general",
+      "path": "structural/struct-04-deep-nesting-guard-clauses",
+      "added_files": ["src/order_validation.py", "tests/test_order_validation.py"],
+      "severity": "low"
+    },
+    {
+      "id": "struct-05-mixed-logging-dead-code",
+      "category": "structural",
+      "target_specialist": "synthesizer_general",
+      "path": "structural/struct-05-mixed-logging-dead-code",
+      "added_files": ["src/notification_sender.py", "tests/test_notification_sender.py"],
+      "severity": "low"
+    }
+  ]
+}

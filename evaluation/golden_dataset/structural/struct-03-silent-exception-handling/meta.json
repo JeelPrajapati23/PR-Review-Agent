@@ -1,0 +1,19 @@
+{
+  "id": "struct-03-silent-exception-handling",
+  "category": "structural",
+  "target_specialist": "synthesizer_general",
+  "pr_title": "Add CSV row parsing for the order import job",
+  "pr_description": "Adds parse_row()/parse_rows() to normalize uploaded CSV rows into order records, skipping any malformed rows.",
+  "added_files": [
+    "src/import_job.py",
+    "tests/test_import_job.py"
+  ],
+  "modified_files": [],
+  "injected_issue": "parse_row() uses a bare `except: pass`, silently swallowing every exception (including unrelated bugs and control-flow exceptions) with no logging, while parse_rows() uses print() for its own diagnostics even though the module already defines a logger -- inconsistent, silent error handling.",
+  "expected_findings": {
+    "must_flag_file": "import_job.py",
+    "issue_keywords": ["bare except", "silent", "swallow", "inconsistent logging", "print"],
+    "severity": "medium"
+  },
+  "why_tests_dont_catch_it": "The malformed-row test only asserts that parse_rows() returns an empty list, never that anything was logged or how the failure was surfaced, so the bare except and the print/logger inconsistency both pass unnoticed."
+}

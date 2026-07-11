@@ -1,0 +1,15 @@
+{
+  "id": "perf-05-race-condition-counter",
+  "category": "performance",
+  "judged_at_utc": "2026-07-11T11:07:25.976036+00:00",
+  "wall_clock_seconds": 3.8,
+  "judge_model": "gemini-2.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": false,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review correctly identified the race condition and lack of thread-safety in request_counter.py, matching the ground truth issue and its medium severity. However, it incorrectly placed this performance-related issue under 'Security & Correctness Issues' instead of 'Performance Observations'."
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "struct-05-mixed-logging-dead-code",
+  "category": "structural",
+  "target_specialist": "synthesizer_general",
+  "pr_title": "Add customer notification sender for order-status updates",
+  "pr_description": "Adds send_notification() so the order pipeline can email customers when their order status changes.",
+  "added_files": [
+    "src/notification_sender.py",
+    "tests/test_notification_sender.py"
+  ],
+  "modified_files": [],
+  "injected_issue": "send_notification() mixes print() debugging statements with the module's own logger, and leaves a large block of commented-out legacy implementation in place instead of being deleted -- dead code and inconsistent logging left behind from development.",
+  "expected_findings": {
+    "must_flag_file": "notification_sender.py",
+    "issue_keywords": ["dead code", "commented-out", "print", "inconsistent logging"],
+    "severity": "low"
+  },
+  "why_tests_dont_catch_it": "Both tests only assert on the boolean return value of send_notification(); they don't inspect stdout or check for leftover commented code, so the print statements and dead code block have no effect on pass/fail."
+}

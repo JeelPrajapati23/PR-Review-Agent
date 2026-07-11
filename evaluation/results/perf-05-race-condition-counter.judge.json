@@ -1,0 +1,15 @@
+{
+  "id": "perf-05-race-condition-counter",
+  "category": "performance",
+  "judged_at_utc": "2026-07-10T12:04:53.245756+00:00",
+  "wall_clock_seconds": 8.9,
+  "judge_model": "gemini-2.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": false,
+    "section_correct": false,
+    "severity_matched": false,
+    "false_positive_count": 1,
+    "reasoning": "The review failed to identify the ground-truth race condition in `request_counter.py`, stating 'None found' under 'Performance Observations'. Instead, it raised a different, unrelated concern about a potential KeyError if an API key is not present, which counts as a false positive against the specific ground truth."
+  }
+}

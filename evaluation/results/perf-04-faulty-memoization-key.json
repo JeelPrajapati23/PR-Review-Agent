@@ -1,0 +1,23 @@
+{
+  "id": "perf-04-faulty-memoization-key",
+  "category": "performance",
+  "target_specialist": "performance_architect",
+  "expected_findings": {
+    "must_flag_file": "pricing_cache.py",
+    "issue_keywords": [
+      "cache key",
+      "memoization",
+      "stale",
+      "incorrect result"
+    ],
+    "severity": "high"
+  },
+  "reviewed_at_utc": "2026-07-10T11:12:03.781437+00:00",
+  "wall_clock_seconds": 129.9,
+  "agent_result": {
+    "repository": "octocat/gitops-eval-fixture",
+    "pr_number": 900009,
+    "status": "completed",
+    "summary": "## Summary\nThe code review panel reviewed the src/pricing_cache.py file and found issues with the memoization key.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nNone found.\n\n## Security & Correctness Issues\nIn src/pricing_cache.py, the memoization key only considers the customer segment, not the base price, which could lead to incorrect results if the same segment is used with different base prices.\n\n## Architectural Suggestions\nNone found.\n\n## Validation Outcome\nNone found."
+  }
+}

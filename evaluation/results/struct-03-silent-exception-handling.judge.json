@@ -1,0 +1,15 @@
+{
+  "id": "struct-03-silent-exception-handling",
+  "category": "structural",
+  "judged_at_utc": "2026-07-10T12:05:14.729845+00:00",
+  "wall_clock_seconds": 10.3,
+  "judge_model": "gemini-2.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 1,
+    "reasoning": "The review correctly identified the bare 'except' clause in src/import_job.py and its potential to catch unintended exceptions, aligning with the ground truth's core issue and severity. It placed this finding appropriately under 'Security & Correctness Issues'. However, it also raised an unverified concern about test coverage in tests/test_import_job.py which is not part of the ground truth."
+  }
+}

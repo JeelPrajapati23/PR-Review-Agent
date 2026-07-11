@@ -1,0 +1,22 @@
+{
+  "id": "sec-01-sql-injection",
+  "category": "security",
+  "target_specialist": "security_warden",
+  "expected_findings": {
+    "must_flag_file": "user_repository.py",
+    "issue_keywords": [
+      "sql injection",
+      "parameteriz",
+      "prepared statement"
+    ],
+    "severity": "high"
+  },
+  "reviewed_at_utc": "2026-07-10T09:48:56.900842+00:00",
+  "wall_clock_seconds": 126.1,
+  "agent_result": {
+    "repository": "octocat/gitops-eval-fixture",
+    "pr_number": 900001,
+    "status": "completed",
+    "summary": "## Summary\nReviewed src/user_repository.py for security and performance issues\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nNone found.\n\n## Security & Correctness Issues\nIn src/user_repository.py, the find_user_by_username function is vulnerable to SQL injection attacks.\n\n## Architectural Suggestions\nNone found.\n\n## Validation Outcome\nNone found."
+  }
+}

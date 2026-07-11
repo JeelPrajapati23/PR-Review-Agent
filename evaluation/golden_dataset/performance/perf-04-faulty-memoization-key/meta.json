@@ -1,0 +1,19 @@
+{
+  "id": "perf-04-faulty-memoization-key",
+  "category": "performance",
+  "target_specialist": "performance_architect",
+  "pr_title": "Cache discount calculations per customer segment",
+  "pr_description": "Adds get_discounted_price() to avoid recomputing the discount function for repeat lookups in the same customer segment.",
+  "added_files": [
+    "src/pricing_cache.py",
+    "tests/test_pricing_cache.py"
+  ],
+  "modified_files": [],
+  "injected_issue": "The cache is keyed only on segment and ignores base_price, so the second call for a segment with a different base_price incorrectly returns the first cached price instead of recomputing -- a correctness regression, not just a cache-hit-rate issue.",
+  "expected_findings": {
+    "must_flag_file": "pricing_cache.py",
+    "issue_keywords": ["cache key", "memoization", "stale", "incorrect result"],
+    "severity": "high"
+  },
+  "why_tests_dont_catch_it": "The only test that exercises the cache reuse path calls get_discounted_price() twice with the exact same base_price (50.0) for the same segment, so the wrong cache key never produces a visibly wrong price."
+}

@@ -1,0 +1,15 @@
+{
+  "id": "struct-05-mixed-logging-dead-code",
+  "category": "structural",
+  "judged_at_utc": "2026-07-10T12:05:35.711747+00:00",
+  "wall_clock_seconds": 6.4,
+  "judge_model": "gemini-2.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": false,
+    "severity_matched": true,
+    "false_positive_count": 2,
+    "reasoning": "The review correctly identifies 'leftover debug prints' from the ground truth, which matches the low severity. However, it fails to mention the 'dead code' aspect and places the finding only in the summary, not a dedicated section. It also includes two false positives: 'inadequate email validation' and 'lack of logging for notification messages'."
+  }
+}

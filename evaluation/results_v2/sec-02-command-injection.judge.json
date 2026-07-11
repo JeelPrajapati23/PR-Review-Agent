@@ -1,0 +1,15 @@
+{
+  "id": "sec-02-command-injection",
+  "category": "security",
+  "judged_at_utc": "2026-07-11T11:06:09.956011+00:00",
+  "wall_clock_seconds": 3.5,
+  "judge_model": "gemini-2.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review accurately identifies the command injection vulnerability in `compress_directory()` due to `shell=True` and places it in the correct \"Security & Correctness Issues\" section. The severity is appropriately conveyed as a direct vulnerability."
+  }
+}

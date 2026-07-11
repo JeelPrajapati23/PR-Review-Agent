@@ -1,0 +1,19 @@
+{
+  "id": "sec-01-sql-injection",
+  "category": "security",
+  "target_specialist": "security_warden",
+  "pr_title": "Add username lookup helper for the login flow",
+  "pr_description": "Adds find_user_by_username() so the login handler can look up a user record by their username before checking the password hash.",
+  "added_files": [
+    "src/user_repository.py",
+    "tests/test_user_repository.py"
+  ],
+  "modified_files": [],
+  "injected_issue": "find_user_by_username() builds its SQL query via string concatenation instead of a parameterized query, allowing SQL injection through the username parameter.",
+  "expected_findings": {
+    "must_flag_file": "user_repository.py",
+    "issue_keywords": ["sql injection", "parameteriz", "prepared statement"],
+    "severity": "high"
+  },
+  "why_tests_dont_catch_it": "Both tests only pass benign, well-formed usernames ('alice', 'ghost'), so the string-concatenated query still returns the expected row and the suite stays green."
+}

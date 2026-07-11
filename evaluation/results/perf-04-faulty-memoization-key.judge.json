@@ -1,0 +1,15 @@
+{
+  "id": "perf-04-faulty-memoization-key",
+  "category": "performance",
+  "judged_at_utc": "2026-07-10T12:03:56.043926+00:00",
+  "wall_clock_seconds": 4.2,
+  "judge_model": "gemini-2.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review accurately identifies that the memoization key in pricing_cache.py ignores the base price, leading to incorrect results, which perfectly matches the ground truth. The issue is correctly categorized under 'Security & Correctness Issues' given its impact on correctness, and the description conveys a high severity problem."
+  }
+}

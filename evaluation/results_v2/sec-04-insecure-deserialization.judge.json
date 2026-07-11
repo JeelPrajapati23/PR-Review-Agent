@@ -1,0 +1,15 @@
+{
+  "id": "sec-04-insecure-deserialization",
+  "category": "security",
+  "judged_at_utc": "2026-07-11T11:06:21.965978+00:00",
+  "wall_clock_seconds": 6.2,
+  "judge_model": "gemini-2.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 1,
+    "reasoning": "The review accurately identifies the insecure use of the pickle module in cache_layer.py, explicitly mentioning the risk of arbitrary code execution from untrusted data, which matches the ground truth's high-severity security issue. It correctly places this finding under 'Security & Correctness Issues' and conveys appropriate severity. However, it includes a false positive claim about 'potential performance issues due to the lack of protocol version specification' in the summary, which is not part of the ground truth."
+  }
+}

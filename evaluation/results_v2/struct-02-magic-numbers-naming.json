@@ -1,0 +1,23 @@
+{
+  "id": "struct-02-magic-numbers-naming",
+  "category": "structural",
+  "target_specialist": "synthesizer_general",
+  "expected_findings": {
+    "must_flag_file": "checkout_pricing.py",
+    "issue_keywords": [
+      "magic number",
+      "naming",
+      "readability",
+      "named constant"
+    ],
+    "severity": "low"
+  },
+  "reviewed_at_utc": "2026-07-11T10:43:46.944444+00:00",
+  "wall_clock_seconds": 123.3,
+  "agent_result": {
+    "repository": "octocat/gitops-eval-fixture",
+    "pr_number": 900012,
+    "status": "completed",
+    "summary": "## Summary\nThe code review found several issues with the src/checkout_pricing.py file, including the use of magic numbers and a lack of descriptive function names. The tests/test_checkout_pricing.py file should also cover more scenarios, including the bulk discount threshold.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nThe code does not handle edge cases well, such as the bulk discount threshold, as noted in tests/test_checkout_pricing.py.\n\n## Security & Correctness Issues\nNone found.\n\n## Architectural Suggestions\nThe function calc in src/checkout_pricing.py uses several magic numbers (0.925, 1.13, 42, 5) without clear explanations. The function name should be more descriptive to improve code readability.\n\n## Validation Outcome\nNone found."
+  }
+}

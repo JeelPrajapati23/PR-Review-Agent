@@ -1,0 +1,15 @@
+{
+  "id": "perf-01-quadratic-duplicate-check",
+  "category": "performance",
+  "judged_at_utc": "2026-07-10T12:03:36.431778+00:00",
+  "wall_clock_seconds": 3.9,
+  "judge_model": "gemini-2.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review correctly identified the O(n^2) complexity in dedupe.py due to nested loops and suggested the O(n) set-based improvement, matching the ground truth precisely. The finding was placed in the appropriate 'Performance Observations' section and its treatment aligns with a medium severity issue. No false positives were introduced."
+  }
+}

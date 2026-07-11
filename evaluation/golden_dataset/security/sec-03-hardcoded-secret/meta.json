@@ -1,0 +1,19 @@
+{
+  "id": "sec-03-hardcoded-secret",
+  "category": "security",
+  "target_specialist": "security_warden",
+  "pr_title": "Add PaymentClient wrapper for the Acme Payments API",
+  "pr_description": "Introduces a small client for submitting charge requests to the (fictional) Acme Payments gateway.",
+  "added_files": [
+    "src/payment_client.py",
+    "tests/test_payment_client.py"
+  ],
+  "modified_files": [],
+  "injected_issue": "API_KEY is a live-looking secret hardcoded directly in source, and charge() logs the full request payload -- including the raw card number and the API key -- at INFO level via logger.info.",
+  "expected_findings": {
+    "must_flag_file": "payment_client.py",
+    "issue_keywords": ["hardcoded", "secret", "sensitive data", "logging", "card number"],
+    "severity": "high"
+  },
+  "why_tests_dont_catch_it": "The test mocks the HTTP client entirely and only asserts on the returned status, so it never inspects what was logged or where the API key came from."
+}

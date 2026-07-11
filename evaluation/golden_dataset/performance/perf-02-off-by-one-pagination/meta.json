@@ -1,0 +1,19 @@
+{
+  "id": "perf-02-off-by-one-pagination",
+  "category": "performance",
+  "target_specialist": "performance_architect",
+  "pr_title": "Add page slicing helper for the list API endpoints",
+  "pr_description": "Adds get_page() to slice a result set into 1-indexed pages for the API's list endpoints.",
+  "added_files": [
+    "src/pagination.py",
+    "tests/test_pagination.py"
+  ],
+  "modified_files": [],
+  "injected_issue": "get_page() computes end = start + page_size - 1 instead of start + page_size, so every slice is one item short of page_size and the last item of every page is silently dropped and never appears on any page.",
+  "expected_findings": {
+    "must_flag_file": "pagination.py",
+    "issue_keywords": ["off-by-one", "off by one", "boundary", "dropped item"],
+    "severity": "medium"
+  },
+  "why_tests_dont_catch_it": "The tests only check the first item of a page and that overflow pages are empty; none of them assert the full page length or that the last item of a page range (e.g. item 5 or item 10) actually appears in the results."
+}

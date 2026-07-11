@@ -1,0 +1,15 @@
+{
+  "id": "struct-01-duplicated-validation-logic",
+  "category": "structural",
+  "judged_at_utc": "2026-07-10T12:05:02.122640+00:00",
+  "wall_clock_seconds": 3.6,
+  "judge_model": "gemini-2.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": false,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review correctly identifies the duplicated code in the specified functions within its summary. However, it fails to place this structural issue into an appropriate dedicated section like 'Architectural Suggestions'. The mention in the summary aligns with the low severity of the issue."
+  }
+}

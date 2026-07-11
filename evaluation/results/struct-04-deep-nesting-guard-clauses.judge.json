@@ -1,0 +1,15 @@
+{
+  "id": "struct-04-deep-nesting-guard-clauses",
+  "category": "structural",
+  "judged_at_utc": "2026-07-10T12:05:25.017991+00:00",
+  "wall_clock_seconds": 10.7,
+  "judge_model": "gemini-2.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": false,
+    "section_correct": false,
+    "severity_matched": false,
+    "false_positive_count": 0,
+    "reasoning": "The review completely missed the ground-truth issue regarding the six levels of nested if/else statements and the suggestion for early-return guard clauses. Instead, it focused on missing validation checks for empty/None values and data types, which are different concerns. Without the code, it's not possible to determine if these other issues are false positives."
+  }
+}

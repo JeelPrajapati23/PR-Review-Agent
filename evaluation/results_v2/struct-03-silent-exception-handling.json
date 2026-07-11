@@ -1,0 +1,24 @@
+{
+  "id": "struct-03-silent-exception-handling",
+  "category": "structural",
+  "target_specialist": "synthesizer_general",
+  "expected_findings": {
+    "must_flag_file": "import_job.py",
+    "issue_keywords": [
+      "bare except",
+      "silent",
+      "swallow",
+      "inconsistent logging",
+      "print"
+    ],
+    "severity": "medium"
+  },
+  "reviewed_at_utc": "2026-07-11T10:45:50.223098+00:00",
+  "wall_clock_seconds": 125.1,
+  "agent_result": {
+    "repository": "octocat/gitops-eval-fixture",
+    "pr_number": 900013,
+    "status": "completed",
+    "summary": "## Summary\nThe code in src/import_job.py has several issues, including a bare 'except' clause that catches and silently ignores all exceptions, and a function that does not explicitly return None when an exception occurs.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nNone found.\n\n## Security & Correctness Issues\nIn src/import_job.py, the bare 'except' clause will catch and silently ignore all exceptions, including ones that might be important to know about or handle differently, such as system-exiting exceptions like SystemExit or KeyboardInterrupt.\n\n## Architectural Suggestions\nIn src/import_job.py, the bare 'except' clause should be avoided, as it can mask bugs and make debugging difficult. Instead, the function should log the exception and then return None. The function parse_row should explicitly return None when an exception occurs, to make it clear that the function can return None. Additionally, instead of just printing that a bad row was skipped, log a warning with the actual row that was skipped, so that it's possible to diagnose why it was skipped.\n\n## Validation Outcome\nNone found."
+  }
+}

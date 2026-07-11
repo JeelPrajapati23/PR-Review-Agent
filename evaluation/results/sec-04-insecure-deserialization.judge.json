@@ -1,0 +1,15 @@
+{
+  "id": "sec-04-insecure-deserialization",
+  "category": "security",
+  "judged_at_utc": "2026-07-10T12:03:24.190679+00:00",
+  "wall_clock_seconds": 6.2,
+  "judge_model": "gemini-2.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 1,
+    "reasoning": "The review correctly identified the insecure deserialization vulnerability in `cache_layer.py` due to `pickle`'s ability to execute arbitrary code, placing it appropriately under 'Security & Correctness Issues' with a suitable level of concern. However, it included one false positive regarding the `pickle.dump` protocol version, which is not the ground truth issue and is incorrectly framed as a 'potential security vulnerability' in this context."
+  }
+}

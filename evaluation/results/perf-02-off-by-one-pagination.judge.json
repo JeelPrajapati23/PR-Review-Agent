@@ -1,0 +1,15 @@
+{
+  "id": "perf-02-off-by-one-pagination",
+  "category": "performance",
+  "judged_at_utc": "2026-07-10T12:03:42.423888+00:00",
+  "wall_clock_seconds": 7.6,
+  "judge_model": "gemini-2.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": false,
+    "section_correct": false,
+    "severity_matched": false,
+    "false_positive_count": 1,
+    "reasoning": "The review failed to identify the ground truth off-by-one error where the calculated end index causes items to be dropped. Instead, it raised a false positive about an IndexError if the end index exceeds the list length, which Python slicing handles gracefully without error. The ground truth issue was also categorized as 'performance', but the review explicitly stated 'None found' in that section."
+  }
+}

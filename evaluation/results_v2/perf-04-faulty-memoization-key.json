@@ -1,0 +1,23 @@
+{
+  "id": "perf-04-faulty-memoization-key",
+  "category": "performance",
+  "target_specialist": "performance_architect",
+  "expected_findings": {
+    "must_flag_file": "pricing_cache.py",
+    "issue_keywords": [
+      "cache key",
+      "memoization",
+      "stale",
+      "incorrect result"
+    ],
+    "severity": "high"
+  },
+  "reviewed_at_utc": "2026-07-11T10:34:34.067232+00:00",
+  "wall_clock_seconds": 136.3,
+  "agent_result": {
+    "repository": "octocat/gitops-eval-fixture",
+    "pr_number": 900009,
+    "status": "completed",
+    "summary": "## Summary\nThe code in src/pricing_cache.py has a caching issue that can lead to incorrect results if the same segment is used with different base prices. The cache key should include both segment and base_price to avoid stale results.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nNone found.\n\n## Security & Correctness Issues\nIn src/pricing_cache.py, the cache only stores the result for a segment, but not for a specific base price, which can lead to incorrect results if the same segment is used with different base prices.\n\n## Architectural Suggestions\nThe cache key should include both segment and base_price to avoid stale results for different base prices within the same segment.\n\n## Validation Outcome\nNone found."
+  }
+}

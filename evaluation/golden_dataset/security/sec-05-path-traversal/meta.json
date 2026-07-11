@@ -1,0 +1,19 @@
+{
+  "id": "sec-05-path-traversal",
+  "category": "security",
+  "target_specialist": "security_warden",
+  "pr_title": "Add attachment reader for the file-download endpoint",
+  "pr_description": "Adds read_user_file() so the download endpoint can serve a user-uploaded attachment by filename from a shared base directory.",
+  "added_files": [
+    "src/file_server.py",
+    "tests/test_file_server.py"
+  ],
+  "modified_files": [],
+  "injected_issue": "read_user_file() joins base_dir with an unsanitized filename and never verifies the resolved path stays within base_dir, so a filename like '../../../../etc/passwd' escapes the intended directory (path traversal).",
+  "expected_findings": {
+    "must_flag_file": "file_server.py",
+    "issue_keywords": ["path traversal", "directory traversal", "sanitiz", "resolve"],
+    "severity": "high"
+  },
+  "why_tests_dont_catch_it": "The only test reads a plain filename ('notes.txt') that was just written inside the base directory, so it never exercises a '../' filename that would escape it."
+}

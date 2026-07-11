@@ -1,0 +1,15 @@
+{
+  "id": "struct-05-mixed-logging-dead-code",
+  "category": "structural",
+  "judged_at_utc": "2026-07-11T11:09:19.950868+00:00",
+  "wall_clock_seconds": 8.2,
+  "judge_model": "gemini-2.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": false,
+    "false_positive_count": 1,
+    "reasoning": "The review correctly identified the presence of `print()` debugging statements and the need for consistent logging, which is part of the ground truth issue. It placed this under 'Architectural Suggestions' which is appropriate for a structural issue. However, it failed to identify the 'dead code' (commented-out block) and incorrectly claimed the prints were 'leaking sensitive customer information,' which is not stated in the ground truth and elevates the severity beyond the intended 'low'."
+  }
+}

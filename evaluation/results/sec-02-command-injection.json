@@ -1,0 +1,22 @@
+{
+  "id": "sec-02-command-injection",
+  "category": "security",
+  "target_specialist": "security_warden",
+  "expected_findings": {
+    "must_flag_file": "archive_tool.py",
+    "issue_keywords": [
+      "command injection",
+      "shell=true",
+      "shell injection"
+    ],
+    "severity": "high"
+  },
+  "reviewed_at_utc": "2026-07-10T09:51:02.956749+00:00",
+  "wall_clock_seconds": 99.0,
+  "agent_result": {
+    "repository": "octocat/gitops-eval-fixture",
+    "pr_number": 900002,
+    "status": "completed",
+    "summary": "## Summary\nThe code in src/archive_tool.py has been reviewed for security and performance issues.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nNone found.\n\n## Security & Correctness Issues\nThe code in src/archive_tool.py is vulnerable to command injection attacks because it uses the shell=True argument with subprocess.run() or user-provided input.\n\n## Architectural Suggestions\nNone found.\n\n## Validation Outcome\nNone found."
+  }
+}

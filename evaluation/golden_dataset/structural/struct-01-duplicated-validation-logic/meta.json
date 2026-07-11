@@ -1,0 +1,19 @@
+{
+  "id": "struct-01-duplicated-validation-logic",
+  "category": "structural",
+  "target_specialist": "synthesizer_general",
+  "pr_title": "Add email validation for the signup and login forms",
+  "pr_description": "Adds validate_email_signup() and validate_email_login() so both forms reject malformed email addresses before submission.",
+  "added_files": [
+    "src/signup_validation.py",
+    "tests/test_signup_validation.py"
+  ],
+  "modified_files": [],
+  "injected_issue": "validate_email_signup() and validate_email_login() are byte-for-byte duplicated function bodies (same strip/length/regex checks) that should be extracted into a single shared helper -- a maintainability smell, not a functional bug.",
+  "expected_findings": {
+    "must_flag_file": "signup_validation.py",
+    "issue_keywords": ["duplicat", "extract", "shared helper", "dry"],
+    "severity": "low"
+  },
+  "why_tests_dont_catch_it": "Both functions behave identically and every test passes; test suites verify behavior, not the absence of duplication, so copy-pasted logic never surfaces as a failure."
+}

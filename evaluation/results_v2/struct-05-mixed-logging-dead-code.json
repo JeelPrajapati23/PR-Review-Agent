@@ -1,0 +1,23 @@
+{
+  "id": "struct-05-mixed-logging-dead-code",
+  "category": "structural",
+  "target_specialist": "synthesizer_general",
+  "expected_findings": {
+    "must_flag_file": "notification_sender.py",
+    "issue_keywords": [
+      "dead code",
+      "commented-out",
+      "print",
+      "inconsistent logging"
+    ],
+    "severity": "low"
+  },
+  "reviewed_at_utc": "2026-07-11T11:01:35.883206+00:00",
+  "wall_clock_seconds": 146.4,
+  "agent_result": {
+    "repository": "octocat/gitops-eval-fixture",
+    "pr_number": 900015,
+    "status": "completed",
+    "summary": "## Summary\nThe code in src/notification_sender.py has leftover debug prints that should be replaced with proper debug log statements to avoid leaking sensitive customer information and to maintain consistency in logging.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nNone found.\n\n## Security & Correctness Issues\nThe code in src/notification_sender.py has a leftover debug print that leaks sensitive customer information.\n\n## Architectural Suggestions\nThe code in src/notification_sender.py has leftover debug prints that should be replaced with proper debug log statements to maintain consistency in logging and avoid polluting the standard output.\n\n## Validation Outcome\nNone found."
+  }
+}

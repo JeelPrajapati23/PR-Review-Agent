@@ -1,0 +1,19 @@
+{
+  "id": "sec-02-command-injection",
+  "category": "security",
+  "target_specialist": "security_warden",
+  "pr_title": "Add zip-based export for user report directories",
+  "pr_description": "Adds compress_directory() so the export job can zip a user's report directory before it's downloaded.",
+  "added_files": [
+    "src/archive_tool.py",
+    "tests/test_archive_tool.py"
+  ],
+  "modified_files": [],
+  "injected_issue": "compress_directory() interpolates the caller-supplied directory_name straight into a shell string and runs it with subprocess.run(..., shell=True), allowing shell metacharacters in directory_name to inject arbitrary commands.",
+  "expected_findings": {
+    "must_flag_file": "archive_tool.py",
+    "issue_keywords": ["command injection", "shell=true", "shell injection"],
+    "severity": "high"
+  },
+  "why_tests_dont_catch_it": "subprocess.run is mocked entirely, and both tests only pass simple alphanumeric directory names ('reports', 'missing_dir'), so no shell metacharacter ever reaches the (mocked) shell."
+}

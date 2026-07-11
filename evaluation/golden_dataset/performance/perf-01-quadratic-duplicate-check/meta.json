@@ -1,0 +1,19 @@
+{
+  "id": "perf-01-quadratic-duplicate-check",
+  "category": "performance",
+  "target_specialist": "performance_architect",
+  "pr_title": "Add duplicate detection to the CSV import job",
+  "pr_description": "Adds has_duplicates() to flag CSV batches that contain repeated values before they're written to the orders table.",
+  "added_files": [
+    "src/dedupe.py",
+    "tests/test_dedupe.py"
+  ],
+  "modified_files": [],
+  "injected_issue": "has_duplicates() compares every pair of items with a nested double loop (O(n^2)) instead of using a set for an O(n) check, on a function documented as running on batches of tens of thousands of rows on the hot import path.",
+  "expected_findings": {
+    "must_flag_file": "dedupe.py",
+    "issue_keywords": ["o(n^2)", "quadratic", "nested loop", "set"],
+    "severity": "medium"
+  },
+  "why_tests_dont_catch_it": "The tests only use tiny 0-3 element lists, so correctness holds and the quadratic blow-up at import-sized volumes never shows up as a test failure or timeout."
+}

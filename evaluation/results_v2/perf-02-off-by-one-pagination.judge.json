@@ -1,0 +1,15 @@
+{
+  "id": "perf-02-off-by-one-pagination",
+  "category": "performance",
+  "judged_at_utc": "2026-07-11T11:06:40.180545+00:00",
+  "wall_clock_seconds": 7.4,
+  "judge_model": "gemini-2.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": false,
+    "severity_matched": true,
+    "false_positive_count": 1,
+    "reasoning": "The review correctly identifies the 'off-by-one error in the end index calculation' in pagination.py. However, it incorrectly places this issue under 'Architectural Suggestions' and states 'Performance Observations: None found', despite the ground truth category being performance. The review also incorrectly claims a lack of input validation for page_number and page_size being less than 1, which the code actually handles by defaulting."
+  }
+}

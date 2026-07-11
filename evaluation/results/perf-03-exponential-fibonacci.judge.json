@@ -1,0 +1,15 @@
+{
+  "id": "perf-03-exponential-fibonacci",
+  "category": "performance",
+  "judged_at_utc": "2026-07-10T12:03:50.054190+00:00",
+  "wall_clock_seconds": 3.7,
+  "judge_model": "gemini-2.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review correctly identifies the exponential time complexity of the fibonacci function due to repeated computations and suggests memoization, directly matching the ground truth. This performance issue is appropriately placed under 'Performance Observations' and 'Architectural Suggestions', and its treatment aligns with a medium severity concern. No false positives were found."
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "id": "sec-01-sql-injection",
+  "category": "security",
+  "judged_at_utc": "2026-07-10T11:57:11.294820+00:00",
+  "wall_clock_seconds": 7.1,
+  "judge_model": "gemini-3.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review correctly identifies the SQL injection vulnerability in the find_user_by_username function of user_repository.py. It places this finding in the 'Security & Correctness Issues' section and does not introduce any false positives."
+  }
+}

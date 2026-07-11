@@ -1,0 +1,23 @@
+{
+  "id": "sec-04-insecure-deserialization",
+  "category": "security",
+  "target_specialist": "security_warden",
+  "expected_findings": {
+    "must_flag_file": "cache_layer.py",
+    "issue_keywords": [
+      "pickle",
+      "insecure deserialization",
+      "arbitrary code execution",
+      "untrusted"
+    ],
+    "severity": "high"
+  },
+  "reviewed_at_utc": "2026-07-10T10:46:27.692765+00:00",
+  "wall_clock_seconds": 158.1,
+  "agent_result": {
+    "repository": "octocat/gitops-eval-fixture",
+    "pr_number": 900004,
+    "status": "completed",
+    "summary": "## Summary\nCode review of src/cache_layer.py\n\n## Performance Observations\nIn src/cache_layer.py, the `pickle.dump` function is used without specifying the protocol version. To prevent potential security vulnerabilities, use the highest protocol version available for pickling.\n\n## Edge Cases\nNone found.\n\n## Security & Correctness Issues\nIn src/cache_layer.py, the pickle module is used to load and save cached objects. However, the pickle module is not secure against erroneous or maliciously constructed data and can execute arbitrary code.\n\n## Architectural Suggestions\nNone found.\n\n## Validation Outcome\nNone found."
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "id": "perf-01-quadratic-duplicate-check",
+  "category": "performance",
+  "judged_at_utc": "2026-07-11T11:06:34.172175+00:00",
+  "wall_clock_seconds": 4.1,
+  "judge_model": "gemini-2.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review correctly identified the O(n^2) performance issue in dedupe.py, suggesting the O(n) set-based solution. It placed this finding appropriately under 'Performance Observations' and treated it with a suitable level of concern for a medium-severity issue. No false positives were introduced."
+  }
+}

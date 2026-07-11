@@ -1,0 +1,23 @@
+{
+  "id": "sec-05-path-traversal",
+  "category": "security",
+  "target_specialist": "security_warden",
+  "expected_findings": {
+    "must_flag_file": "file_server.py",
+    "issue_keywords": [
+      "path traversal",
+      "directory traversal",
+      "sanitiz",
+      "resolve"
+    ],
+    "severity": "high"
+  },
+  "reviewed_at_utc": "2026-07-10T10:49:05.786429+00:00",
+  "wall_clock_seconds": 122.8,
+  "agent_result": {
+    "repository": "octocat/gitops-eval-fixture",
+    "pr_number": 900005,
+    "status": "completed",
+    "summary": "## Summary\nThe code in src/file_server.py has been reviewed for security and performance issues.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nNone found.\n\n## Security & Correctness Issues\nIn src/file_server.py, the function read_user_file() is vulnerable to path traversal attacks.\n\n## Architectural Suggestions\nNone found.\n\n## Validation Outcome\nNone found."
+  }
+}

@@ -1,0 +1,191 @@
+{
+  "per_fixture": [
+    {
+      "id": "sec-01-sql-injection",
+      "category": "security",
+      "status": "completed",
+      "file_flagged": true,
+      "matched_keywords": [
+        "sql injection"
+      ],
+      "caught": true,
+      "severity": "high"
+    },
+    {
+      "id": "sec-02-command-injection",
+      "category": "security",
+      "status": "completed",
+      "file_flagged": true,
+      "matched_keywords": [
+        "command injection",
+        "shell=true"
+      ],
+      "caught": true,
+      "severity": "high"
+    },
+    {
+      "id": "sec-03-hardcoded-secret",
+      "category": "security",
+      "status": "completed",
+      "file_flagged": true,
+      "matched_keywords": [
+        "hardcoded"
+      ],
+      "caught": true,
+      "severity": "high"
+    },
+    {
+      "id": "sec-04-insecure-deserialization",
+      "category": "security",
+      "status": "completed",
+      "file_flagged": true,
+      "matched_keywords": [
+        "pickle"
+      ],
+      "caught": true,
+      "severity": "high"
+    },
+    {
+      "id": "sec-05-path-traversal",
+      "category": "security",
+      "status": "completed",
+      "file_flagged": true,
+      "matched_keywords": [
+        "path traversal"
+      ],
+      "caught": true,
+      "severity": "high"
+    },
+    {
+      "id": "perf-01-quadratic-duplicate-check",
+      "category": "performance",
+      "status": "completed",
+      "file_flagged": true,
+      "matched_keywords": [
+        "o(n^2)",
+        "nested loop",
+        "set"
+      ],
+      "caught": true,
+      "severity": "medium"
+    },
+    {
+      "id": "perf-02-off-by-one-pagination",
+      "category": "performance",
+      "status": "completed",
+      "file_flagged": true,
+      "matched_keywords": [],
+      "caught": false,
+      "severity": "medium"
+    },
+    {
+      "id": "perf-03-exponential-fibonacci",
+      "category": "performance",
+      "status": "completed",
+      "file_flagged": true,
+      "matched_keywords": [
+        "exponential",
+        "memoiz"
+      ],
+      "caught": true,
+      "severity": "medium"
+    },
+    {
+      "id": "perf-04-faulty-memoization-key",
+      "category": "performance",
+      "status": "completed",
+      "file_flagged": true,
+      "matched_keywords": [
+        "memoization",
+        "incorrect result"
+      ],
+      "caught": true,
+      "severity": "high"
+    },
+    {
+      "id": "perf-05-race-condition-counter",
+      "category": "performance",
+      "status": "completed",
+      "file_flagged": true,
+      "matched_keywords": [],
+      "caught": false,
+      "severity": "medium"
+    },
+    {
+      "id": "struct-01-duplicated-validation-logic",
+      "category": "structural",
+      "status": "completed",
+      "file_flagged": true,
+      "matched_keywords": [
+        "duplicat"
+      ],
+      "caught": true,
+      "severity": "low"
+    },
+    {
+      "id": "struct-02-magic-numbers-naming",
+      "category": "structural",
+      "status": "completed",
+      "file_flagged": true,
+      "matched_keywords": [
+        "magic number",
+        "readability",
+        "named constant"
+      ],
+      "caught": true,
+      "severity": "low"
+    },
+    {
+      "id": "struct-03-silent-exception-handling",
+      "category": "structural",
+      "status": "completed",
+      "file_flagged": true,
+      "matched_keywords": [],
+      "caught": false,
+      "severity": "medium"
+    },
+    {
+      "id": "struct-04-deep-nesting-guard-clauses",
+      "category": "structural",
+      "status": "completed",
+      "file_flagged": true,
+      "matched_keywords": [],
+      "caught": false,
+      "severity": "low"
+    },
+    {
+      "id": "struct-05-mixed-logging-dead-code",
+      "category": "structural",
+      "status": "completed",
+      "file_flagged": true,
+      "matched_keywords": [
+        "print"
+      ],
+      "caught": true,
+      "severity": "low"
+    }
+  ],
+  "per_category": {
+    "security": {
+      "total": 5,
+      "reviewed": 5,
+      "caught": 5,
+      "not_reviewed": 0,
+      "no_finding": 0
+    },
+    "performance": {
+      "total": 5,
+      "reviewed": 5,
+      "caught": 3,
+      "not_reviewed": 0,
+      "no_finding": 2
+    },
+    "structural": {
+      "total": 5,
+      "reviewed": 5,
+      "caught": 3,
+      "not_reviewed": 0,
+      "no_finding": 2
+    }
+  }
+}

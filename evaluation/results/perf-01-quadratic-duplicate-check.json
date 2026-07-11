@@ -1,0 +1,23 @@
+{
+  "id": "perf-01-quadratic-duplicate-check",
+  "category": "performance",
+  "target_specialist": "performance_architect",
+  "expected_findings": {
+    "must_flag_file": "dedupe.py",
+    "issue_keywords": [
+      "o(n^2)",
+      "quadratic",
+      "nested loop",
+      "set"
+    ],
+    "severity": "medium"
+  },
+  "reviewed_at_utc": "2026-07-10T10:31:46.178373+00:00",
+  "wall_clock_seconds": 114.5,
+  "agent_result": {
+    "repository": "octocat/gitops-eval-fixture",
+    "pr_number": 900006,
+    "status": "completed",
+    "summary": "## Summary\nThe code in src/dedupe.py has been reviewed for security and performance.\n\n## Performance Observations\nThe current implementation in src/dedupe.py has a time complexity of O(n^2) due to the nested loops, which can be improved to O(n) using a set to keep track of seen items.\n\n## Edge Cases\nNone found.\n\n## Security & Correctness Issues\nNone found.\n\n## Architectural Suggestions\nNone found.\n\n## Validation Outcome\nNone found."
+  }
+}

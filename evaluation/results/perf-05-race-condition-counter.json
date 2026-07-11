@@ -1,0 +1,23 @@
+{
+  "id": "perf-05-race-condition-counter",
+  "category": "performance",
+  "target_specialist": "performance_architect",
+  "expected_findings": {
+    "must_flag_file": "request_counter.py",
+    "issue_keywords": [
+      "race condition",
+      "thread-safe",
+      "lock",
+      "concurren"
+    ],
+    "severity": "medium"
+  },
+  "reviewed_at_utc": "2026-07-10T11:19:21.309624+00:00",
+  "wall_clock_seconds": 119.3,
+  "agent_result": {
+    "repository": "octocat/gitops-eval-fixture",
+    "pr_number": 900010,
+    "status": "completed",
+    "summary": "## Summary\nThe code in src/request_counter.py was reviewed for security and performance issues.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nNone found.\n\n## Security & Correctness Issues\nIn src/request_counter.py, the current implementation does not handle the case where the API key is not present in the dictionary, which could lead to a KeyError.\n\n## Architectural Suggestions\nNone found.\n\n## Validation Outcome\nNone found."
+  }
+}

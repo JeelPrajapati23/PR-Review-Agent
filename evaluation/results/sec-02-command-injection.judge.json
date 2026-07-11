@@ -1,0 +1,15 @@
+{
+  "id": "sec-02-command-injection",
+  "category": "security",
+  "judged_at_utc": "2026-07-10T11:57:18.421665+00:00",
+  "wall_clock_seconds": 33.9,
+  "judge_model": "gemini-3.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review correctly identifies the command injection vulnerability in src/archive_tool.py caused by using shell=True with subprocess.run(). It places this finding in the correct section (Security & Correctness Issues) and does not introduce any false positives."
+  }
+}

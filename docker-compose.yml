@@ -1,0 +1,109 @@
+services:
+  redis_broker:
+    # redis:8-alpine, not the requested redis:7-alpine: CLAUDE.md documents
+    # (from a confirmed, hard-won finding) that plain upstream redis:alpine
+    # lacks the RediSearch + RedisJSON modules langgraph-checkpoint-redis's
+    # AsyncRedisSaver requires, and that "Redis 8's alpine image bundles
+    # them natively" is the specific version confirmed to work -- swapping
+    # in a module-less Redis makes AsyncRedisSaver.asetup() fail at startup,
+    # breaking every review. Flagging this deviation explicitly rather than
+    # silently matching the literal ask.
+    image: redis:8-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal
+    # Deliberately no `ports:` -- unreachable from the host or outside the
+    # internal bridge network; only fastapi_web/celery_worker can reach it,
+    # by service name, over `internal`.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  fastapi_web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Overrides .env's localhost defaults: redis is its own service/host
+      # on the internal Docker network now, not localhost.
+      REDIS_URL: redis://redis_broker:6379/0
+      CELERY_BROKER_URL: redis://redis_broker:6379/0
+      CELERY_RESULT_BACKEND: redis://redis_broker:6379/0
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      redis_broker:
+        condition: service_healthy
+    networks:
+      - internal
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # This is a Linux container regardless of the Docker host's own OS
+    # (Docker Desktop on Windows runs containers inside a Linux VM), so
+    # Celery's default prefork pool works here -- unlike the `-P solo`
+    # CLAUDE.md documents as required when running directly on Windows.
+    # --concurrency=1 keeps peak Groq requests-per-minute the same as the
+    # sequential-specialist design already assumes (see app/agent.py's
+    # _build_panel_graph and its Groq free-tier TPM note).
+    command: ["celery", "-A", "app.worker.celery_app", "worker", "--loglevel=info", "--concurrency=1"]
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis_broker:6379/0
+      CELERY_BROKER_URL: redis://redis_broker:6379/0
+      CELERY_RESULT_BACKEND: redis://redis_broker:6379/0
+      GIT_WORKSPACE_ROOT: /app/workspace
+    depends_on:
+      redis_broker:
+        condition: service_healthy
+    networks:
+      - internal
+    volumes:
+      - workspace_data:/app/workspace
+    # Safe to drop every Linux capability *because* the Dockerfile already
+    # runs this whole image as a dedicated non-root appuser (see Dockerfile,
+    # above its USER appuser line, for the full reasoning). A root (UID 0)
+    # process stripped of CAP_SETUID/CAP_SETGID specifically would instead
+    # make every PR review's mcp_servers/tester_server.py subprocess.run(...,
+    # user="nobody") privilege-drop attempt fail with PermissionError --
+    # silently turning every test-suite validation into a clean-looking but
+    # broken "Error: ..." result. Starting unprivileged sidesteps that
+    # conflict: there's no UID change left for the missing capabilities to
+    # break, and this is also the container that runs a PR's own untrusted
+    # test suite, so it's the one where this matters most.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  # Redis backs both the LangGraph checkpointer and the daily token-budget
+  # counters (app/telemetry.py) -- per CLAUDE.md, checkpointing exists
+  # specifically so "a worker crash mid-review doesn't lose progress."
+  # Without a named volume, that guarantee would only last until the next
+  # `docker compose down`.
+  redis_data:
+  # git_workspace_root: PR checkouts. Named so repeated reviews of the same
+  # repo can reuse the existing checkout (see app/git_ops.py's
+  # ensure_repo_checkout) across container restarts instead of re-cloning.
+  workspace_data:

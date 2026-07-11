@@ -1,0 +1,23 @@
+{
+  "id": "perf-02-off-by-one-pagination",
+  "category": "performance",
+  "target_specialist": "performance_architect",
+  "expected_findings": {
+    "must_flag_file": "pagination.py",
+    "issue_keywords": [
+      "off-by-one",
+      "off by one",
+      "boundary",
+      "dropped item"
+    ],
+    "severity": "medium"
+  },
+  "reviewed_at_utc": "2026-07-11T10:24:30.325226+00:00",
+  "wall_clock_seconds": 136.7,
+  "agent_result": {
+    "repository": "octocat/gitops-eval-fixture",
+    "pr_number": 900007,
+    "status": "completed",
+    "summary": "## Summary\nThe code in src/pagination.py has issues with input validation and off-by-one error in the end index calculation.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nThe function get_page in src/pagination.py does not handle the case where page_number or page_size is less than 1.\n\n## Security & Correctness Issues\nThe function get_page in src/pagination.py does not handle invalid page numbers and sizes, which could lead to incorrect results.\n\n## Architectural Suggestions\nThe current implementation in src/pagination.py has an off-by-one error in the end index calculation and lacks input validation for page numbers and sizes.\n\n## Validation Outcome\nNone found."
+  }
+}

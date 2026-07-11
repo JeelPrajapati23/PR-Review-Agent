@@ -1,0 +1,19 @@
+{
+  "id": "struct-04-deep-nesting-guard-clauses",
+  "category": "structural",
+  "target_specialist": "synthesizer_general",
+  "pr_title": "Add order payload validation before fulfillment",
+  "pr_description": "Adds validate_order() to reject incomplete orders before they reach the fulfillment queue.",
+  "added_files": [
+    "src/order_validation.py",
+    "tests/test_order_validation.py"
+  ],
+  "modified_files": [],
+  "injected_issue": "validate_order() nests six levels of if/else ('arrow code') instead of using early-return guard clauses, making the function hard to follow and easy to break when adding another required field.",
+  "expected_findings": {
+    "must_flag_file": "order_validation.py",
+    "issue_keywords": ["deep nesting", "guard clause", "early return", "arrow"],
+    "severity": "low"
+  },
+  "why_tests_dont_catch_it": "The three tests only check the returned error message for a handful of scenarios; the nested structure produces correct output for all of them, so the readability problem never manifests as a failing assertion."
+}
