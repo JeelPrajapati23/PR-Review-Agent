@@ -53,9 +53,18 @@ COPY mcp_servers ./mcp_servers
 # appuser, can write to it without any root step in the runtime path.
 RUN mkdir -p /app/workspace && chown -R appuser:appuser /app
 
+# Single-token launcher scripts, used only by the Azure Container Apps
+# deployment: Azure's `--command`/`--args` CLI flags can't reliably pass
+# tokens starting with `-` (e.g. `--host`), so each Container App points
+# `--command` at one of these instead of overriding command/args directly.
+# docker-compose.yml is unaffected -- it still sets its own `command:`.
+COPY docker/entrypoint-web.sh docker/entrypoint-worker.sh ./
+RUN chmod +x entrypoint-web.sh entrypoint-worker.sh
+
 USER appuser
 
 EXPOSE 8000
 
 # No default CMD: fastapi_web and celery_worker share this one image and
-# supply their own `command:` in docker-compose.yml.
+# supply their own `command:` in docker-compose.yml (or `--command` in
+# Azure Container Apps).
