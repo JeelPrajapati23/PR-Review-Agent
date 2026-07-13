@@ -178,20 +178,32 @@ def test_panel_graph_runs_sequential_topology_and_populates_state():
     # conventions. No network access, no real LLM call, no real Redis.
     call_order: list[str] = []
 
+    security_fix = InlineSuggestion(
+        file_path="app/main.py", line=5, suggested_code="validate(x)", comment="Missing input validation"
+    )
+    performance_fix = InlineSuggestion(
+        file_path="app/main.py", line=12, suggested_code="items[:n]", comment="O(n^2) loop"
+    )
+
     async def fake_run_specialist(persona_key, _prompt, _tools, _checkpointer, _base_thread_id, _task_message, _target_files):
         call_order.append(persona_key)
         if persona_key == "security":
             return {
                 "findings": SpecialistFindings(
-                    findings="SUGGESTION file=app/main.py line=5: validate(x) || Missing input validation",
+                    findings="Missing input validation in app/main.py",
                     validation_notes="None found.",
+                    suggested_fixes=[security_fix],
                 ),
                 "fetched_files": ["main.py"],
                 "circuit_broken": False,
                 "last_message": "security done",
             }
         return {
-            "findings": SpecialistFindings(findings="O(n^2) loop in app/main.py", validation_notes="None found."),
+            "findings": SpecialistFindings(
+                findings="O(n^2) loop in app/main.py",
+                validation_notes="None found.",
+                suggested_fixes=[performance_fix],
+            ),
             "fetched_files": ["main.py"],
             "circuit_broken": False,
             "last_message": "performance done",
@@ -234,8 +246,19 @@ def test_panel_graph_runs_sequential_topology_and_populates_state():
     # strictly in that order (the whole point of the sequential graph).
     assert call_order == ["security", "performance"]
 
-    assert result["security_findings"].findings.startswith("SUGGESTION file=app/main.py")
+    assert result["security_findings"].findings == "Missing input validation in app/main.py"
     assert result["security_circuit_broken"] is False
     assert result["performance_findings"].findings == "O(n^2) loop in app/main.py"
     assert result["performance_circuit_broken"] is False
-    assert result["final_review"] == fake_review
+
+    # inline_suggestions is assembled in synthesizer_node from each
+    # specialist's own suggested_fixes, not left to whatever _synthesize
+    # happened to return (fake_synthesize's return value started with an
+    # empty inline_suggestions list -- synthesizer_node mutates that same
+    # object in place, so this also confirms the other fields pass through
+    # untouched).
+    final_review = result["final_review"]
+    assert final_review.inline_suggestions == [security_fix, performance_fix]
+    assert final_review.summary == "Reviewed app/main.py."
+    assert final_review.performance_observations == "O(n^2) loop in app/main.py."
+    assert final_review.security_correctness_issues == "Missing input validation in app/main.py."

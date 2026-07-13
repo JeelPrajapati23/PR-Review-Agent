@@ -118,16 +118,15 @@ file to resolve just that dependency's path, then fetch_file_contents on the pat
 Never guess at file contents or a file's existence.
 
 You are a read-only reviewer on this panel -- you have no patch tool. When you find a concrete,
-line-level fix, describe it in your findings using exactly this format on its own line:
-SUGGESTION file=<repo-relative-path> line=<1-indexed-line>: <replacement code> || <one-sentence reason>
-fetch_file_contents returns each line prefixed with its exact 1-indexed line number (format:
-"N | code") specifically so you can copy that number directly rather than counting lines yourself
--- always use the number exactly as given, never estimate or recompute it, especially when a file
-has multiple similar-looking blocks. The "N | " prefix is not part of the source: never include it
-in a SUGGESTION's replacement code -- copy only the code after the "| ". Only emit a SUGGESTION
-line for a file you actually fetched and a line number that tool call actually showed you. You may
-call run_validation_suite to observe the existing test suite's current behavior if that's relevant
-to a finding, but you cannot write patches to fix a failure.
+line-level fix, report it as a structured suggested fix (file, line, replacement code, one-sentence
+reason) in addition to describing it in your findings text. fetch_file_contents returns each line
+prefixed with its exact 1-indexed line number (format: "N | code") specifically so you can copy
+that number directly rather than counting lines yourself -- always use the number exactly as
+given, never estimate or recompute it, especially when a file has multiple similar-looking blocks.
+The "N | " prefix is not part of the source: never include it in a suggested fix's replacement
+code. Only report a suggested fix for a file you actually fetched and a line number that tool call
+actually showed you. You may call run_validation_suite to observe the existing test suite's
+current behavior if that's relevant to a finding, but you cannot write patches to fix a failure.
 
 Always use the exact repo_path given to you in the task message when calling tools; never ask the
 user for one. You are a static reviewer, not an interpreter: reason only about the code as written,
@@ -186,9 +185,20 @@ grounded in the actual file contents returned by fetch_file_contents calls above
 code you read. Never invent, simulate, or describe code that was not actually fetched in this
 conversation. Every issue you report in findings MUST explicitly name the exact file it applies to
 (its repo-relative path, e.g. "in app/main.py: ...") -- a downstream check verifies each issue
-against the files actually fetched, so never describe an issue without naming its file. Preserve
-any "SUGGESTION file=... line=...: ... || ..." lines from your findings verbatim inside the
-findings field. Write "None found." for a field with nothing to report."""
+against the files actually fetched, so never describe an issue without naming its file. For every
+issue that has a concrete, line-level fix, also add an entry to suggested_fixes -- do not rely on
+mentioning the fix in prose alone. Write "None found." for a text field with nothing to report."""
+
+
+class InlineSuggestion(BaseModel):
+    """A single line-level fix, rendered as a GitHub suggestion-block review comment."""
+
+    file_path: str = Field(description="Repo-relative path of the file this suggestion applies to.")
+    line: int = Field(description="1-indexed line number in the file's current content where the fix applies.")
+    suggested_code: str = Field(
+        description="Exact replacement text for that line/block, with no diff markers or line numbers."
+    )
+    comment: str = Field(description="One-sentence explanation of the issue being fixed.")
 
 
 class SpecialistFindings(BaseModel):
@@ -196,11 +206,16 @@ class SpecialistFindings(BaseModel):
 
     findings: str = Field(
         description="Concrete issues found within this persona's scope, grounded in the code "
-        "actually read, including any verbatim SUGGESTION lines. 'None found.' if nothing to report."
+        "actually read. 'None found.' if nothing to report."
     )
     validation_notes: str = Field(
         description="Relevant run_validation_suite output/observations, if any were run. "
         "'None found.' if not run or nothing relevant."
+    )
+    suggested_fixes: list[InlineSuggestion] = Field(
+        default_factory=list,
+        description="Concrete line-level fixes for issues in your findings, one per fixable issue. "
+        "Only include a fix for a file/line you actually fetched via fetch_file_contents.",
     )
 
 
@@ -237,21 +252,7 @@ coherent review:
   paraphrases an issue away from its file name will be discarded even if correct.
 - Never invent an issue neither specialist actually reported, and never describe code neither
   report mentions.
-- Extract every line matching "SUGGESTION file=<path> line=<n>: <code> || <reason>" verbatim from
-  either report into inline_suggestions (file_path, line, suggested_code, comment) -- copy the
-  file path and line number exactly as given, and skip anything not in that exact format.
 - Write "None found." for any section neither specialist populated."""
-
-
-class InlineSuggestion(BaseModel):
-    """A single line-level fix, rendered as a GitHub suggestion-block review comment."""
-
-    file_path: str = Field(description="Repo-relative path of the file this suggestion applies to.")
-    line: int = Field(description="1-indexed line number in the file's current content where the fix applies.")
-    suggested_code: str = Field(
-        description="Exact replacement text for that line/block, with no diff markers or line numbers."
-    )
-    comment: str = Field(description="One-sentence explanation of the issue being fixed.")
 
 
 class ReviewOutput(BaseModel):
@@ -287,7 +288,8 @@ class ReviewOutput(BaseModel):
     )
     inline_suggestions: list[InlineSuggestion] = Field(
         default_factory=list,
-        description="Concrete line-level fixes, posted as clickable GitHub suggestion comments. Empty if none.",
+        description="Not populated by this model call -- overwritten by synthesizer_node from the "
+        "specialists' own suggested_fixes after this structured call returns.",
     )
 
 
@@ -597,7 +599,17 @@ def _build_panel_graph(tools: list, checkpointer: AsyncRedisSaver, base_thread_i
         }
 
     async def synthesizer_node(state: PanelState) -> dict:
-        review = await _synthesize(state.get("security_findings"), state.get("performance_findings"))
+        security = state.get("security_findings")
+        performance = state.get("performance_findings")
+        review = await _synthesize(security, performance)
+        if review is not None:
+            # Assembled directly from each specialist's own schema-constrained
+            # suggested_fixes rather than asked of the Synthesizer LLM -- see
+            # SYNTHESIZER_PROMPT's history for why relying on it to extract
+            # fixes back out of free-text findings was unreliable.
+            review.inline_suggestions = (security.suggested_fixes if security else []) + (
+                performance.suggested_fixes if performance else []
+            )
         return {"final_review": review}
 
     graph = StateGraph(PanelState)
