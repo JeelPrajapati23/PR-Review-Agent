@@ -125,8 +125,9 @@ that number directly rather than counting lines yourself -- always use the numbe
 given, never estimate or recompute it, especially when a file has multiple similar-looking blocks.
 The "N | " prefix is not part of the source: never include it in a suggested fix's replacement
 code. Only report a suggested fix for a file you actually fetched and a line number that tool call
-actually showed you. You may call run_validation_suite to observe the existing test suite's
-current behavior if that's relevant to a finding, but you cannot write patches to fix a failure.
+actually showed you. run_validation_suite runs the PR's existing test suite; you cannot write
+patches to fix a failure it surfaces. When you are required to call it is spelled out below, since
+"call it if relevant" on its own is too easy to skip once you already have enough for a finding.
 
 Always use the exact repo_path given to you in the task message when calling tools; never ask the
 user for one. You are a static reviewer, not an interpreter: reason only about the code as written,
@@ -145,13 +146,14 @@ generated from this conversation, so make sure every issue you report was actual
 observed via a tool call first, rather than assumed or simulated."""
 
 
-def _persona_prompt(role: str, focus: str) -> str:
+def _persona_prompt(role: str, focus: str, validation_guidance: str) -> str:
     return (
         f"You are {role} on a multi-specialist code review panel reviewing a pull request via "
         f"MCP tools. Your job is scoped STRICTLY to: {focus} Do not comment on issues outside this "
         "scope -- another specialist on the panel covers those, and a Synthesizer will merge both "
         "of your reports afterwards.\n\n"
-        f"{_PANEL_TOOL_DISCIPLINE}"
+        f"{_PANEL_TOOL_DISCIPLINE}\n\n"
+        f"VALIDATION: {validation_guidance}"
     )
 
 
@@ -160,6 +162,14 @@ SECURITY_WARDEN_PROMPT = _persona_prompt(
     "identifying data leaks (secrets/PII/tokens in code, logs, or output), dependency "
     "vulnerabilities, OWASP Top 10 flaws (injection, broken auth, unsafe deserialization, path "
     "traversal, SSRF, etc.), and code-injection risks.",
+    "Call run_validation_suite if any finding you are about to report asserts or depends on the "
+    "test suite's current behavior -- e.g. before claiming a vulnerable path is untested, or before "
+    "reporting a finding that contradicts what a passing suite would suggest, confirm the suite's "
+    "actual current result rather than assuming it. This panel exists specifically to catch issues "
+    "that slip past a passing test suite, so if the suite passes despite a real vulnerability you "
+    "found, say so explicitly in validation_notes -- that gap is itself worth surfacing. If none of "
+    "your findings depend on the suite's state, skip the call and write 'Not run: no findings "
+    "depended on test suite state.' in validation_notes -- do not write 'None found.' for that case.",
 )
 
 PERFORMANCE_ARCHITECT_PROMPT = _persona_prompt(
@@ -172,6 +182,14 @@ PERFORMANCE_ARCHITECT_PROMPT = _persona_prompt(
     "keyed on the wrong (or incomplete) set of inputs, returning stale results for new inputs. A "
     "bug that never crashes but silently returns the wrong answer is just as real as one that "
     "raises, and is often more dangerous because nothing alerts anyone to it.",
+    "Call run_validation_suite at least once before finishing this review, unless target_files "
+    "contains nothing but non-executable changes (docs, config, markdown). This panel exists "
+    "specifically to catch issues a passing test suite already missed, so for each correctness/"
+    "logic issue you report, note in validation_notes whether the existing suite actually exercises "
+    "the code path behind it -- 'suite passes but does not cover the affected branch/input' is a "
+    "materially more useful observation than just 'suite passes.' Only write 'Not run: target_files "
+    "contained no executable logic.' in validation_notes if you truly skipped the call for that "
+    "reason -- do not write 'None found.' for that case.",
 )
 
 # Used only for each specialist's response_format extraction pass, not the
@@ -187,7 +205,10 @@ conversation. Every issue you report in findings MUST explicitly name the exact 
 (its repo-relative path, e.g. "in app/main.py: ...") -- a downstream check verifies each issue
 against the files actually fetched, so never describe an issue without naming its file. For every
 issue that has a concrete, line-level fix, also add an entry to suggested_fixes -- do not rely on
-mentioning the fix in prose alone. Write "None found." for a text field with nothing to report."""
+mentioning the fix in prose alone. Write "None found." for the findings field if there is nothing
+to report. For validation_notes specifically: write "None found." only if you called
+run_validation_suite and it surfaced nothing relevant; if your persona's VALIDATION guidance
+required the call and you skipped it for a stated reason, write "Not run: <reason>." instead."""
 
 
 class InlineSuggestion(BaseModel):
@@ -209,8 +230,10 @@ class SpecialistFindings(BaseModel):
         "actually read. 'None found.' if nothing to report."
     )
     validation_notes: str = Field(
-        description="Relevant run_validation_suite output/observations, if any were run. "
-        "'None found.' if not run or nothing relevant."
+        description="Relevant run_validation_suite output/observations. If you were required to "
+        "call it and skipped for a stated reason (per your persona's VALIDATION guidance), write "
+        "'Not run: <reason>.' here -- never 'None found.' for a skipped-but-required call. 'None "
+        "found.' is only for 'I called it and it surfaced nothing relevant.'"
     )
     suggested_fixes: list[InlineSuggestion] = Field(
         default_factory=list,
@@ -245,14 +268,18 @@ coherent review:
   Never describe a finding only in summary while every section says "None found." for it -- if a
   finding is worth summarizing, it is worth routing to its section (most often
   architectural_suggestions for structural/maintainability findings).
-- Combine both specialists' validation_notes into validation_outcome.
+- Combine both specialists' validation_notes into validation_outcome. Preserve each one's own
+  wording on whether the suite was actually run -- if either specialist wrote 'Not run: <reason>.',
+  carry that reason into validation_outcome verbatim rather than collapsing it into "None found.";
+  "None found." in validation_outcome must mean the suite was run and surfaced nothing relevant, not
+  that it was skipped.
 - CRITICAL: every specialist report names the exact file each issue applies to. You MUST preserve
   that exact file name in your own wording for every issue you carry into the output -- a
   downstream check verifies each section against the files actually reviewed, so a section that
   paraphrases an issue away from its file name will be discarded even if correct.
 - Never invent an issue neither specialist actually reported, and never describe code neither
   report mentions.
-- Write "None found." for any section neither specialist populated."""
+- Write "None found." for any of the other four sections neither specialist populated."""
 
 
 class ReviewOutput(BaseModel):
@@ -283,8 +310,10 @@ class ReviewOutput(BaseModel):
         "'None found.' if nothing to report."
     )
     validation_outcome: str = Field(
-        description="Result of run_validation_suite calls made during this review. 'None found.' if none "
-        "were run."
+        description="Result of run_validation_suite calls made during this review. 'None found.' means "
+        "the suite was run and nothing relevant surfaced. If either specialist skipped the required "
+        "call, state that as 'Not run: <reason>.' instead -- do not write 'None found.' for a skipped "
+        "call."
     )
     inline_suggestions: list[InlineSuggestion] = Field(
         default_factory=list,
