@@ -202,6 +202,13 @@ python evaluation/evaluate_results.py     # offline keyword-based recall scoring
 python evaluation/judge_results.py        # LLM-as-judge pass (Gemini) -- Precision/Recall/F2
 ```
 
+## Observability
+
+Every LLM call the panel makes is instrumented two ways:
+
+- **Cost/budget telemetry** (always on) — token usage and USD cost per Groq call are recorded to Redis regardless of tracing config; this is what backs the daily budget guard (see [Key features](#key-features)).
+- **LangSmith tracing** (on by default) — set a real `LANGSMITH_API_KEY` in `.env` to get a full trace per PR review: each specialist's ReAct tool-call loop (which files it fetched, which tool calls it made and in what order) and the Synthesizer's structured-output call, all under one project (`LANGSMITH_PROJECT`, default `pr-review-agent`) in the LangSmith UI. With no key configured, tracing silently stays inactive — nothing else changes. Set `LANGSMITH_TRACING=false` to force it off even with a key present.
+
 ## Required GitHub App permissions
 
 - **Contents: Read** — git clone/fetch
