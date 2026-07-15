@@ -138,7 +138,9 @@ def test_build_inline_comments_renders_exact_suggestion_markdown():
         comment="Sanitize user input before returning it.",
     )
 
-    comments = _build_inline_comments([suggestion], fetched_files={"main.py"})
+    comments = _build_inline_comments(
+        [suggestion], fetched_files={"main.py"}, commentable_lines={"app/main.py": {42}}
+    )
 
     assert comments == [
         {
@@ -155,7 +157,28 @@ def test_build_inline_comments_drops_suggestions_for_unfetched_files():
         file_path="app/fabricated.py", line=1, suggested_code="pass", comment="Fabricated fix."
     )
 
-    assert _build_inline_comments([suggestion], fetched_files={"main.py"}) == []
+    assert (
+        _build_inline_comments(
+            [suggestion], fetched_files={"main.py"}, commentable_lines={"app/fabricated.py": {1}}
+        )
+        == []
+    )
+
+
+def test_build_inline_comments_drops_suggestions_outside_the_diff():
+    # main.py was fetched (passes the fabrication guard), but the suggested
+    # line isn't part of the PR's actual diff -- GitHub would 422 the whole
+    # review if this were posted, so it must be dropped before that happens.
+    suggestion = InlineSuggestion(
+        file_path="app/main.py", line=99, suggested_code="pass", comment="Not part of this PR's diff."
+    )
+
+    assert (
+        _build_inline_comments(
+            [suggestion], fetched_files={"main.py"}, commentable_lines={"app/main.py": {42}}
+        )
+        == []
+    )
 
 
 # ---------------------------------------------------------------------------

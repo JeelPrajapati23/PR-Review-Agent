@@ -1,4 +1,5 @@
 import base64
+import re
 from functools import lru_cache
 
 from github import Auth, Github, GithubException, GithubIntegration
@@ -9,6 +10,8 @@ STATUS_CONTEXT = "pr-review-agent"
 
 # GitHub rejects commit status descriptions longer than 140 characters.
 _MAX_STATUS_DESCRIPTION = 140
+
+_HUNK_HEADER_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
 
 class GitHubNotifyError(RuntimeError):
@@ -116,3 +119,40 @@ def list_changed_files(full_name: str, pr_number: int) -> tuple[list[str], list[
         return modified_files, added_files
     except GithubException as exc:
         raise GitHubNotifyError(f"failed to list changed files for {full_name}#{pr_number}: {exc}") from exc
+
+
+def _commentable_lines_from_patch(patch: str) -> set[int]:
+    """Line numbers (in the file's new/RIGHT-side content) that GitHub will
+    accept an inline review comment on for this file -- i.e. actually part of
+    the diff (added or context lines within a hunk), not just present
+    somewhere in the file. Removed lines don't exist in the new file and are
+    skipped without advancing the new-line counter.
+    """
+    lines: set[int] = set()
+    new_line = None
+    for line in patch.splitlines():
+        match = _HUNK_HEADER_RE.match(line)
+        if match:
+            new_line = int(match.group(1))
+            continue
+        if new_line is None or line.startswith("\\"):
+            continue
+        if line.startswith("-"):
+            continue
+        lines.add(new_line)
+        new_line += 1
+    return lines
+
+
+def get_diff_commentable_lines(full_name: str, pr_number: int) -> dict[str, set[int]]:
+    """Map each changed file's repo-relative path to the set of line numbers
+    a review comment can actually be anchored to for this PR -- GitHub's
+    create_review rejects the *entire* review (not just the offending
+    comment) if any comment's (path, line) isn't part of the diff, so callers
+    building inline suggestions must filter against this before posting.
+    """
+    try:
+        pr = get_repo(full_name).get_pull(pr_number)
+        return {f.filename: _commentable_lines_from_patch(f.patch) for f in pr.get_files() if f.patch}
+    except GithubException as exc:
+        raise GitHubNotifyError(f"failed to fetch diff for {full_name}#{pr_number}: {exc}") from exc

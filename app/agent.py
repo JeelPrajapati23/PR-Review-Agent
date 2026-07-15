@@ -15,7 +15,7 @@ from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
-from app.github_client import GitHubNotifyError, post_review, set_commit_status
+from app.github_client import GitHubNotifyError, get_diff_commentable_lines, post_review, set_commit_status
 from app.telemetry import record_usage
 
 logger = logging.getLogger(__name__)
@@ -431,23 +431,46 @@ def _format_suggestion_body(suggestion: InlineSuggestion) -> str:
     return f"{suggestion.comment}\n\n```suggestion\n{suggestion.suggested_code}\n```"
 
 
-def _build_inline_comments(suggestions: list[InlineSuggestion], fetched_files: set[str]) -> list[dict]:
+def _build_inline_comments(
+    suggestions: list[InlineSuggestion],
+    fetched_files: set[str],
+    commentable_lines: dict[str, set[int]],
+) -> list[dict]:
     """Convert InlineSuggestions into GitHub inline review-comment dicts.
 
     Drops any suggestion whose file was not actually fetched during this run
     -- the same fabrication guard as _is_grounded, applied per-suggestion
-    since the model could otherwise invent a plausible file/line pair.
+    since the model could otherwise invent a plausible file/line pair -- and
+    separately drops any suggestion whose (file, line) isn't part of the PR's
+    actual diff. GitHub's create_review rejects the *entire* review, not just
+    the offending comment, if any comment can't be resolved against the diff
+    -- e.g. a specialist suggesting a fix in a fetched dependency file that
+    wasn't itself changed by this PR, or on an existing line of a changed
+    file that the diff doesn't touch.
     """
-    return [
-        {
-            "path": suggestion.file_path,
-            "line": suggestion.line,
-            "side": "RIGHT",
-            "body": _format_suggestion_body(suggestion),
-        }
-        for suggestion in suggestions
-        if Path(suggestion.file_path).name.lower() in fetched_files
-    ]
+    comments = []
+    for suggestion in suggestions:
+        basename = Path(suggestion.file_path).name.lower()
+        if basename not in fetched_files:
+            continue
+
+        resolved_path = suggestion.file_path
+        if resolved_path not in commentable_lines:
+            resolved_path = next(
+                (path for path in commentable_lines if Path(path).name.lower() == basename), None
+            )
+        if resolved_path is None or suggestion.line not in commentable_lines[resolved_path]:
+            continue
+
+        comments.append(
+            {
+                "path": resolved_path,
+                "line": suggestion.line,
+                "side": "RIGHT",
+                "body": _format_suggestion_body(suggestion),
+            }
+        )
+    return comments
 
 
 def _is_grounded(formatted_review: str, fetched_files: set[str]) -> bool:
@@ -731,7 +754,16 @@ async def run_pr_review_agent(pr_metadata: dict, repo_path: Path) -> dict:
                 else:
                     status = "completed"
                     summary_text = formatted_review
-                    inline_comments = _build_inline_comments(structured.inline_suggestions, fetched_files)
+                    try:
+                        commentable_lines = get_diff_commentable_lines(repository, pr_number)
+                    except GitHubNotifyError:
+                        logger.exception(
+                            "Failed to fetch diff for inline-comment validation on %s#%s", repository, pr_number
+                        )
+                        commentable_lines = {}
+                    inline_comments = _build_inline_comments(
+                        structured.inline_suggestions, fetched_files, commentable_lines
+                    )
                     _notify(repository, sha, "success", "PR review agent completed successfully", pr_number)
                     _post_review(repository, pr_number, sha, formatted_review, inline_comments)
 
