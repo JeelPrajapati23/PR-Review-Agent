@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 # before trusting cost totals for anything billing-sensitive, since provider
 # pricing changes without notice and isn't queryable via the Groq API itself.
 _MODEL_PRICING_PER_MILLION_TOKENS: dict[str, dict[str, float]] = {
-    "llama-3.3-70b-versatile": {"prompt": 0.59, "completion": 0.79},
+    "openai/gpt-oss-120b": {"prompt": 0.15, "completion": 0.60},
 }
 
 # Metrics keys expire after this long so old daily telemetry self-cleans

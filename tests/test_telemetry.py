@@ -17,13 +17,13 @@ from app.telemetry import _METRICS_TTL_SECONDS, calculate_cost, check_budget_ok,
 
 
 def test_calculate_cost_known_model():
-    cost = calculate_cost("llama-3.3-70b-versatile", prompt_tokens=1_000_000, completion_tokens=1_000_000)
-    assert cost == pytest.approx(0.59 + 0.79)
+    cost = calculate_cost("openai/gpt-oss-120b", prompt_tokens=1_000_000, completion_tokens=1_000_000)
+    assert cost == pytest.approx(0.15 + 0.60)
 
 
 def test_calculate_cost_scales_linearly_with_tokens():
-    cost = calculate_cost("llama-3.3-70b-versatile", prompt_tokens=500_000, completion_tokens=0)
-    assert cost == pytest.approx(0.295)
+    cost = calculate_cost("openai/gpt-oss-120b", prompt_tokens=500_000, completion_tokens=0)
+    assert cost == pytest.approx(0.075)
 
 
 def test_calculate_cost_unknown_model_returns_zero():
@@ -80,10 +80,10 @@ def test_record_usage_increments_expected_redis_keys():
     today = datetime.now(timezone.utc).date().isoformat()
 
     with patch("app.telemetry._new_redis_client", return_value=fake_client):
-        asyncio.run(record_usage("llama-3.3-70b-versatile", prompt_tokens=1000, completion_tokens=500))
+        asyncio.run(record_usage("openai/gpt-oss-120b", prompt_tokens=1000, completion_tokens=500))
 
     commands = fake_client.pipeline_obj.commands
-    expected_cost = calculate_cost("llama-3.3-70b-versatile", 1000, 500)
+    expected_cost = calculate_cost("openai/gpt-oss-120b", 1000, 500)
 
     assert ("incrby", f"usage:groq:prompt_tokens:{today}", 1000) in commands
     assert ("incrby", f"usage:groq:completion_tokens:{today}", 500) in commands
@@ -97,7 +97,7 @@ def test_record_usage_skips_redis_when_no_tokens_used():
     fake_client = _FakeRedisClient()
 
     with patch("app.telemetry._new_redis_client", return_value=fake_client):
-        asyncio.run(record_usage("llama-3.3-70b-versatile", prompt_tokens=0, completion_tokens=0))
+        asyncio.run(record_usage("openai/gpt-oss-120b", prompt_tokens=0, completion_tokens=0))
 
     assert fake_client.pipeline_obj.commands == []
 
@@ -112,7 +112,7 @@ def test_record_usage_swallows_redis_errors_instead_of_raising():
 
     with patch("app.telemetry._new_redis_client", return_value=_BrokenClient()):
         # A telemetry failure must never fail the review it's instrumenting.
-        asyncio.run(record_usage("llama-3.3-70b-versatile", prompt_tokens=10, completion_tokens=5))
+        asyncio.run(record_usage("openai/gpt-oss-120b", prompt_tokens=10, completion_tokens=5))
 
 
 def test_record_usage_opens_a_fresh_client_across_separate_event_loops():
@@ -128,8 +128,8 @@ def test_record_usage_opens_a_fresh_client_across_separate_event_loops():
         return client
 
     with patch("app.telemetry._new_redis_client", side_effect=make_client):
-        asyncio.run(record_usage("llama-3.3-70b-versatile", prompt_tokens=1000, completion_tokens=500))
-        asyncio.run(record_usage("llama-3.3-70b-versatile", prompt_tokens=100, completion_tokens=50))
+        asyncio.run(record_usage("openai/gpt-oss-120b", prompt_tokens=1000, completion_tokens=500))
+        asyncio.run(record_usage("openai/gpt-oss-120b", prompt_tokens=100, completion_tokens=50))
 
     assert len(seen_clients) == 2
     assert seen_clients[0] is not seen_clients[1]
@@ -170,7 +170,7 @@ def test_check_budget_ok_true_when_under_limit():
     )
 
     with patch("app.telemetry._get_sync_redis_client", return_value=fake_client):
-        assert check_budget_ok("llama-3.3-70b-versatile", safe_limit=90_000) is True
+        assert check_budget_ok("openai/gpt-oss-120b", safe_limit=90_000) is True
 
 
 def test_check_budget_ok_false_when_over_limit():
@@ -180,14 +180,14 @@ def test_check_budget_ok_false_when_over_limit():
     )
 
     with patch("app.telemetry._get_sync_redis_client", return_value=fake_client):
-        assert check_budget_ok("llama-3.3-70b-versatile", safe_limit=90_000) is False
+        assert check_budget_ok("openai/gpt-oss-120b", safe_limit=90_000) is False
 
 
 def test_check_budget_ok_true_when_no_usage_recorded_yet():
     fake_client = _FakeSyncRedisClient({})
 
     with patch("app.telemetry._get_sync_redis_client", return_value=fake_client):
-        assert check_budget_ok("llama-3.3-70b-versatile") is True
+        assert check_budget_ok("openai/gpt-oss-120b") is True
 
 
 def test_check_budget_ok_fails_open_on_redis_error():
@@ -196,4 +196,4 @@ def test_check_budget_ok_fails_open_on_redis_error():
             raise ConnectionError("redis is down")
 
     with patch("app.telemetry._get_sync_redis_client", return_value=_BrokenClient()):
-        assert check_budget_ok("llama-3.3-70b-versatile") is True
+        assert check_budget_ok("openai/gpt-oss-120b") is True

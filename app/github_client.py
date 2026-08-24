@@ -2,7 +2,7 @@ import base64
 import re
 from functools import lru_cache
 
-from github import Auth, Github, GithubException, GithubIntegration
+from github import Auth, Github, GithubIntegration
 
 from app.config import get_settings
 
@@ -69,7 +69,13 @@ def set_commit_status(full_name: str, sha: str, state: str, description: str) ->
             description=description[:_MAX_STATUS_DESCRIPTION],
             context=STATUS_CONTEXT,
         )
-    except GithubException as exc:
+    except Exception as exc:
+        # Broad on purpose: get_repo() resolves the App installation and mints
+        # a JWT before any HTTP request is even made, so a malformed/expired
+        # App key fails here as a jwt.exceptions.PyJWTError, not a
+        # GithubException -- callers only ever catch GitHubNotifyError, so a
+        # narrower except here would let that escape and crash the review
+        # instead of degrading gracefully like every other GitHub failure.
         raise GitHubNotifyError(f"failed to set '{state}' status on {full_name}@{sha}: {exc}") from exc
 
 
@@ -96,7 +102,7 @@ def post_review(
             pr.create_review(commit=commit, body=body, event="COMMENT", comments=comments)
         else:
             pr.create_review(body=body, event="COMMENT")
-    except GithubException as exc:
+    except Exception as exc:
         raise GitHubNotifyError(f"failed to post review on {full_name}#{pr_number}: {exc}") from exc
 
 
@@ -117,7 +123,7 @@ def list_changed_files(full_name: str, pr_number: int) -> tuple[list[str], list[
             else:
                 modified_files.append(f.filename)
         return modified_files, added_files
-    except GithubException as exc:
+    except Exception as exc:
         raise GitHubNotifyError(f"failed to list changed files for {full_name}#{pr_number}: {exc}") from exc
 
 
@@ -154,5 +160,5 @@ def get_diff_commentable_lines(full_name: str, pr_number: int) -> dict[str, set[
     try:
         pr = get_repo(full_name).get_pull(pr_number)
         return {f.filename: _commentable_lines_from_patch(f.patch) for f in pr.get_files() if f.patch}
-    except GithubException as exc:
+    except Exception as exc:
         raise GitHubNotifyError(f"failed to fetch diff for {full_name}#{pr_number}: {exc}") from exc

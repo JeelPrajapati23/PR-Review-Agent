@@ -18,6 +18,8 @@ Measured against a 15-fixture golden dataset of deliberately injected bugs (SQL 
 - **Precision:** ~71% (6 false positives across 15 fixtures)
 - **F2 score** (recall weighted 4x over precision — a missed vulnerability costs more than a false positive): **≈0.93**
 
+These results were measured against the review panel running on Groq's `llama-3.3-70b-versatile`, since deprecated and replaced by `openai/gpt-oss-120b` (see [Tech stack](#tech-stack)) — they have not yet been re-run on the current model.
+
 See [`evaluation/`](evaluation/) for the full harness and methodology.
 
 ## Key features
@@ -140,7 +142,7 @@ tests/          Fast, fully-mocked test suite (pytest)
 
 - **API / worker:** FastAPI, Celery, Redis (broker, checkpointer, and telemetry store)
 - **Agent orchestration:** LangGraph (`StateGraph`), LangChain
-- **LLM:** Groq (`llama-3.3-70b-versatile`), Gemini (`gemini-3.5-flash`, evaluation judge only)
+- **LLM:** Groq (`openai/gpt-oss-120b`), Gemini (`gemini-3.5-flash`, evaluation judge only)
 - **Tool protocol:** MCP (Model Context Protocol), stdio transport
 - **GitHub integration:** PyGithub, GitHub App authentication (short-lived installation tokens, not a static PAT)
 - **Deployment:** Docker, Azure Container Apps, Azure Managed Redis (Enterprise), ACR, GitHub Actions (OIDC-authenticated)

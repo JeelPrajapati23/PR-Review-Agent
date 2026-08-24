@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     github_webhook_secret: str
     git_workspace_root: str = "app/workspace"
     groq_api_key: str
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "openai/gpt-oss-120b"
     # GitHub App auth (replaces the old static PAT): app_id + private key are
     # exchanged for a short-lived, per-installation access token at call time
     # (see app/github_client.py) rather than used directly against the API.
