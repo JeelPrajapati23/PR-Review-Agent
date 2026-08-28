@@ -69,9 +69,10 @@ services:
         - docker/**
         - Dockerfile
         - requirements.lock
-    envVarGroups:
-      - pr-review-shared
     envVars:
+      # Service.envVars has no separate "envVarGroups" field -- a group is
+      # linked by putting a `fromGroup` item directly in this same list.
+      - fromGroup: pr-review-shared
       # entrypoint-web.sh reads $PORT with an 8000 fallback; Render injects
       # its own PORT and expects the container to listen on it, so this
       # value must match whatever Render actually assigns for HTTP routing.
@@ -94,8 +95,8 @@ services:
         - docker/**
         - Dockerfile
         - requirements.lock
-    envVarGroups:
-      - pr-review-shared
+    envVars:
+      - fromGroup: pr-review-shared
 
   - type: pserv
     name: redis-stack
