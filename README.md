@@ -134,7 +134,7 @@ flowchart TD
 app/            FastAPI webhook receiver + Celery worker + LangGraph review agent
 mcp_servers/    Standalone stdio MCP servers exposing repo actions to the agent
 evaluation/     Golden dataset + scripts for measuring review-panel quality
-docker/         Container entrypoint scripts for Azure Container Apps deployment
+docker/         Container entrypoint scripts used by render.yaml's dockerCommand
 tests/          Fast, fully-mocked test suite (pytest)
 ```
 
@@ -145,7 +145,7 @@ tests/          Fast, fully-mocked test suite (pytest)
 - **LLM:** Groq (`openai/gpt-oss-120b`), Gemini (`gemini-3.5-flash`, evaluation judge only)
 - **Tool protocol:** MCP (Model Context Protocol), stdio transport
 - **GitHub integration:** PyGithub, GitHub App authentication (short-lived installation tokens, not a static PAT)
-- **Deployment:** Docker, Azure Container Apps, Azure Managed Redis (Enterprise), ACR, GitHub Actions (OIDC-authenticated)
+- **Deployment:** Docker, Render (web service + background worker), self-hosted Redis Stack on Render (private service) for the module-capable checkpointer store
 
 ## Getting started
 
@@ -219,7 +219,7 @@ Every LLM call the panel makes is instrumented two ways:
 
 ## Deployment
 
-Deployed on **Azure Container Apps** — the FastAPI web app and Celery worker run as separate Container Apps sharing one image, backed by Azure Managed Redis (Enterprise, `NoCluster` policy) and ACR. CI/CD is a GitHub Actions workflow (`.github/workflows/deploy-azure.yml`) authenticated to Azure via OIDC (no stored cloud credentials), triggered on changes to `app/`, `mcp_servers/`, `docker/`, or the Dockerfile.
+Deployed on **Render**, defined as a single Blueprint (`render.yaml`): `pr-review-web` (public web service) and `pr-review-worker` (background worker) share the one Dockerfile, plus a `redis-stack` private service running `redis/redis-stack-server` for the LangGraph checkpointer's RediSearch/RedisJSON module requirement — Render's own managed Redis offering doesn't support custom modules, so this is self-hosted instead, on a persistent disk, reachable only over Render's private network (plain `redis://`, no TLS). Render builds the Dockerfile itself and auto-deploys on push to `main`, scoped by `render.yaml`'s per-service `buildFilter` paths (`app/`, `mcp_servers/`, `docker/`, `Dockerfile`, `requirements.lock`) — no separate CI workflow or registry needed.
 
 ## Security notes
 
