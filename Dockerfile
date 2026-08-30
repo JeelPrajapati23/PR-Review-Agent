@@ -53,18 +53,9 @@ COPY mcp_servers ./mcp_servers
 # appuser, can write to it without any root step in the runtime path.
 RUN mkdir -p /app/workspace && chown -R appuser:appuser /app
 
-# Single-token launcher scripts. render.yaml points each Render service's
-# `dockerCommand` at one of these (pr-review-web -> entrypoint-web.sh,
-# pr-review-worker -> entrypoint-worker.sh) instead of overriding the full
-# command/args inline. docker-compose.yml is unaffected -- it still sets its
-# own `command:`.
-COPY docker/entrypoint-web.sh docker/entrypoint-worker.sh ./
-RUN chmod +x entrypoint-web.sh entrypoint-worker.sh
-
 USER appuser
 
 EXPOSE 8000
 
 # No default CMD: fastapi_web and celery_worker share this one image and
-# supply their own `command:` in docker-compose.yml (or `dockerCommand` in
-# render.yaml).
+# supply their own `command:` in docker-compose.yml.

@@ -44,6 +44,12 @@ services:
         condition: service_healthy
     networks:
       - internal
+      # Shared VM: TLS/reverse-proxy is a pre-existing Caddy instance owned by
+      # another project on this box (not part of this docker-compose.yml at
+      # all), so fastapi_web joins its network to be reachable by container
+      # name from that Caddy's own Caddyfile (`reverse_proxy fastapi_web:8000`)
+      # -- see shared_proxy's `external: true` below.
+      - shared_proxy
     cap_drop:
       - ALL
     security_opt:
@@ -95,6 +101,12 @@ services:
 networks:
   internal:
     driver: bridge
+  # Pre-existing network created by the other project's docker-compose.yml
+  # (its default project network, "app_webnet") -- not created or owned by
+  # this file. `docker network ls` on the VM must already show this name.
+  shared_proxy:
+    external: true
+    name: app_webnet
 
 volumes:
   # Redis backs both the LangGraph checkpointer and the daily token-budget

@@ -134,7 +134,7 @@ flowchart TD
 app/            FastAPI webhook receiver + Celery worker + LangGraph review agent
 mcp_servers/    Standalone stdio MCP servers exposing repo actions to the agent
 evaluation/     Golden dataset + scripts for measuring review-panel quality
-docker/         Container entrypoint scripts used by render.yaml's dockerCommand
+deploy/         VM provisioning + redeploy scripts for the Oracle Cloud deployment
 tests/          Fast, fully-mocked test suite (pytest)
 ```
 
@@ -145,7 +145,7 @@ tests/          Fast, fully-mocked test suite (pytest)
 - **LLM:** Groq (`openai/gpt-oss-120b`), Gemini (`gemini-3.5-flash`, evaluation judge only)
 - **Tool protocol:** MCP (Model Context Protocol), stdio transport
 - **GitHub integration:** PyGithub, GitHub App authentication (short-lived installation tokens, not a static PAT)
-- **Deployment:** Docker, Render (web service + background worker), self-hosted Redis Stack on Render (private service) for the module-capable checkpointer store
+- **Deployment:** Docker Compose on an Oracle Cloud "Always Free" VM, Caddy (automatic HTTPS), GitHub Actions (SSH-triggered redeploy)
 
 ## Getting started
 
@@ -219,7 +219,7 @@ Every LLM call the panel makes is instrumented two ways:
 
 ## Deployment
 
-Deployed on **Render**, defined as a single Blueprint (`render.yaml`): `pr-review-web` (public web service) and `pr-review-worker` (background worker) share the one Dockerfile, plus a `redis-stack` private service running `redis/redis-stack-server` for the LangGraph checkpointer's RediSearch/RedisJSON module requirement — Render's own managed Redis offering doesn't support custom modules, so this is self-hosted instead, on a persistent disk, reachable only over Render's private network (plain `redis://`, no TLS). Render builds the Dockerfile itself and auto-deploys on push to `main`, scoped by `render.yaml`'s per-service `buildFilter` paths (`app/`, `mcp_servers/`, `docker/`, `Dockerfile`, `requirements.lock`) — no separate CI workflow or registry needed.
+Deployed via `docker-compose.yml` on a single Oracle Cloud "Always Free" VM — `fastapi_web`, `celery_worker`, and `redis_broker` (Redis 8, for both the Celery broker and the LangGraph checkpointer's RediSearch/RedisJSON module requirement) all run as containers on that one box, plus a `caddy` container that terminates HTTPS on 80/443 with an automatically-issued Let's Encrypt cert for `DOMAIN` and reverse-proxies to `fastapi_web`. `deploy/setup-vm.sh` is the one-time provisioning script (Docker install + firewall rules + initial clone); `deploy/deploy.sh` pulls `main` and rebuilds/restarts every container, run either by hand on the VM or automatically via `.github/workflows/deploy-oracle.yml`, which SSHes in and runs it on every push to `main` that touches `app/`, `mcp_servers/`, `Dockerfile`, `docker-compose.yml`, `Caddyfile`, or `requirements.lock`.
 
 ## Security notes
 

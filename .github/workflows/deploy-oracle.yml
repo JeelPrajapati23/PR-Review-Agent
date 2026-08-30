@@ -1,0 +1,27 @@
+name: Deploy to Oracle Cloud VM
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "mcp_servers/**"
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - "Caddyfile"
+      - "requirements.lock"
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH and redeploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ORACLE_VM_HOST }}
+          username: ${{ secrets.ORACLE_VM_USER }}
+          key: ${{ secrets.ORACLE_VM_SSH_KEY }}
+          script: |
+            cd ~/pr-review-agent
+            ./deploy/deploy.sh
