@@ -8,7 +8,6 @@ on:
       - "mcp_servers/**"
       - "Dockerfile"
       - "docker-compose.yml"
-      - "Caddyfile"
       - "requirements.lock"
   workflow_dispatch: {}
 
