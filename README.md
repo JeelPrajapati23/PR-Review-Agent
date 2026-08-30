@@ -145,7 +145,7 @@ tests/          Fast, fully-mocked test suite (pytest)
 - **LLM:** Groq (`openai/gpt-oss-120b`), Gemini (`gemini-3.5-flash`, evaluation judge only)
 - **Tool protocol:** MCP (Model Context Protocol), stdio transport
 - **GitHub integration:** PyGithub, GitHub App authentication (short-lived installation tokens, not a static PAT)
-- **Deployment:** Docker Compose on an Oracle Cloud "Always Free" VM, Caddy (automatic HTTPS), GitHub Actions (SSH-triggered redeploy)
+- **Deployment:** Docker Compose on a shared Oracle Cloud "Always Free" VM, behind another project's Caddy instance (automatic HTTPS), GitHub Actions (SSH-triggered redeploy)
 
 ## Getting started
 
@@ -219,7 +219,7 @@ Every LLM call the panel makes is instrumented two ways:
 
 ## Deployment
 
-Deployed via `docker-compose.yml` on a single Oracle Cloud "Always Free" VM — `fastapi_web`, `celery_worker`, and `redis_broker` (Redis 8, for both the Celery broker and the LangGraph checkpointer's RediSearch/RedisJSON module requirement) all run as containers on that one box, plus a `caddy` container that terminates HTTPS on 80/443 with an automatically-issued Let's Encrypt cert for `DOMAIN` and reverse-proxies to `fastapi_web`. `deploy/setup-vm.sh` is the one-time provisioning script (Docker install + firewall rules + initial clone); `deploy/deploy.sh` pulls `main` and rebuilds/restarts every container, run either by hand on the VM or automatically via `.github/workflows/deploy-oracle.yml`, which SSHes in and runs it on every push to `main` that touches `app/`, `mcp_servers/`, `Dockerfile`, `docker-compose.yml`, `Caddyfile`, or `requirements.lock`.
+Deployed via `docker-compose.yml` (`fastapi_web`, `celery_worker`, `redis_broker` — Redis 8, for both the Celery broker and the LangGraph checkpointer's RediSearch/RedisJSON module requirement) on an Oracle Cloud "Always Free" VM at `pr-review-agent.live`. The VM is shared with another project, which already runs its own Caddy container owning ports 80/443 — so this repo has no `caddy` service of its own; `fastapi_web` instead joins that project's Docker network (`app_webnet`, referenced as an external network) so its Caddy can reverse-proxy to `fastapi_web:8000` by name. The actual Caddy site config for this domain lives outside this repo, directly on the VM. `deploy/deploy.sh` pulls `main` and rebuilds/restarts this project's containers, run either by hand on the VM or automatically via `.github/workflows/deploy-oracle.yml`, which SSHes in and runs it on every push to `main` that touches `app/`, `mcp_servers/`, `Dockerfile`, `docker-compose.yml`, or `requirements.lock`. `deploy/setup-vm.sh` is a one-time provisioning script written for a dedicated fresh VM (Docker install + firewall rules + initial clone) — only its clone/`.env`-seeding steps were actually needed on this shared VM, since Docker was already installed there.
 
 ## Security notes
 
