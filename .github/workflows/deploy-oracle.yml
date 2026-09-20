@@ -23,4 +23,4 @@ jobs:
           key: ${{ secrets.ORACLE_VM_SSH_KEY }}
           script: |
             cd ~/pr-review-agent
-            ./deploy/deploy.sh
+            bash deploy/deploy.sh
