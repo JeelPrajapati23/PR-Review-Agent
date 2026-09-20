@@ -15,7 +15,13 @@ from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
-from app.github_client import GitHubNotifyError, get_diff_commentable_lines, post_review, set_commit_status
+from app.github_client import (
+    GitHubNotifyError,
+    format_diff_for_review,
+    get_diff_commentable_lines,
+    post_review,
+    set_commit_status,
+)
 from app.telemetry import record_usage
 
 logger = logging.getLogger(__name__)
@@ -111,23 +117,34 @@ def _stop_on_repeated_tool_errors(state: ReviewAgentState) -> dict | Command:
 # minus the WRITE/SELF-HEAL steps -- specialists have no apply_code_patch.
 _PANEL_TOOL_DISCIPLINE = """You do not have a repo-wide file listing tool, and must not try to
 reconstruct one -- scanning the whole repository wastes context and is forbidden. The task message
-gives you an explicit target_files list: the files this PR actually modified or added. Immediately
-call fetch_file_contents on every file in target_files. If one of those files has a local
-(same-project) import whose logic matters to your review, call scan_local_dependencies on that
-file to resolve just that dependency's path, then fetch_file_contents on the paths it returns.
-Never guess at file contents or a file's existence.
+gives you the PR's actual diffs directly, under a "DIFFS" section -- one per target file that
+GitHub could compute a diff for, already showing only the changed hunks (plus a little surrounding
+context) rather than the whole file. Review those diffs directly; do NOT call fetch_file_contents
+on a file whose diff is already shown just to re-read the same file in full -- Groq's per-minute
+token budget is tight, and re-fetching a file you already have is the single biggest way to blow
+through it. Only call fetch_file_contents on a diff-shown file as an exception, when a hunk
+references something not visible in the shown lines (a helper function, a class field, an import)
+and you genuinely need to see it to confirm or refute a finding -- not as a default step. If the
+task message also lists a "FILES REQUIRING FULL FETCH" section (files too large or binary for
+GitHub to diff), you must call fetch_file_contents on each of those before reviewing them, same as
+before. If a file (from either section) has a local (same-project) import whose logic matters to
+your review, call scan_local_dependencies on that file to resolve just that dependency's path, then
+fetch_file_contents on the paths it returns. Never guess at file contents or a file's existence.
 
 You are a read-only reviewer on this panel -- you have no patch tool. When you find a concrete,
 line-level fix, report it as a structured suggested fix (file, line, replacement code, one-sentence
-reason) in addition to describing it in your findings text. fetch_file_contents returns each line
-prefixed with its exact 1-indexed line number (format: "N | code") specifically so you can copy
-that number directly rather than counting lines yourself -- always use the number exactly as
-given, never estimate or recompute it, especially when a file has multiple similar-looking blocks.
-The "N | " prefix is not part of the source: never include it in a suggested fix's replacement
-code. Only report a suggested fix for a file you actually fetched and a line number that tool call
-actually showed you. run_validation_suite runs the PR's existing test suite; you cannot write
-patches to fix a failure it surfaces. When you are required to call it is spelled out below, since
-"call it if relevant" on its own is too easy to skip once you already have enough for a finding.
+reason) in addition to describing it in your findings text. Every line shown to you -- whether in a
+DIFFS section or returned by fetch_file_contents -- is prefixed with its exact 1-indexed new-file
+line number (format: "N | code"; a removed line in a diff has no number, since it doesn't exist in
+the new file and can't be a fix target) specifically so you can copy that number directly rather
+than counting lines yourself -- always use the number exactly as given, never estimate or
+recompute it, especially when a file has multiple similar-looking blocks. The "N | " prefix is not
+part of the source: never include it in a suggested fix's replacement code. Only report a suggested
+fix for a file you actually saw (via a DIFFS section or a fetch_file_contents call) and a line
+number that source actually showed you. run_validation_suite runs the PR's existing test suite; you
+cannot write patches to fix a failure it surfaces. When you are required to call it is spelled out
+below, since "call it if relevant" on its own is too easy to skip once you already have enough for
+a finding.
 
 Always use the exact repo_path given to you in the task message when calling tools; never ask the
 user for one. You are a static reviewer, not an interpreter: reason only about the code as written,
@@ -334,6 +351,7 @@ class PanelState(TypedDict):
 
     task_message: str
     target_files: list[str]
+    diff_shown_files: list[str]
     security_findings: NotRequired[SpecialistFindings | None]
     security_fetched_files: NotRequired[list[str]]
     security_circuit_broken: NotRequired[bool]
@@ -414,6 +432,17 @@ def _fetched_file_names(messages: list) -> set[str]:
         if name and not _tool_message_text(message).startswith("Error:"):
             fetched.add(name)
     return fetched
+
+
+def _combine_fetched_files(messages: list, diff_shown_files: list[str]) -> set[str]:
+    """Files this specialist should be treated as having actually reviewed:
+    those fetched via fetch_file_contents, plus any whose diff was shown
+    directly in the task message. A diff-shown file is GitHub-verified
+    content, not model output, so counting it here gives the same grounding
+    guarantee an actual fetch_file_contents call would -- just via a cheaper
+    delivery path (see _PANEL_TOOL_DISCIPLINE).
+    """
+    return _fetched_file_names(messages) | set(diff_shown_files)
 
 
 def _format_review(review: ReviewOutput) -> str:
@@ -525,6 +554,7 @@ async def _run_specialist(
     base_thread_id: str,
     task_message: str,
     target_files: list[str],
+    diff_shown_files: list[str],
 ) -> dict:
     """Run one specialist persona's own ReAct sub-agent to completion.
 
@@ -560,9 +590,10 @@ async def _run_specialist(
     messages = result["messages"]
     prompt_tokens, completion_tokens = _sum_usage_metadata(messages)
     await record_usage(settings.groq_model, prompt_tokens, completion_tokens)
+    fetched_files = _combine_fetched_files(messages, diff_shown_files)
     return {
         "findings": result.get("structured_response"),
-        "fetched_files": sorted(_fetched_file_names(messages)),
+        "fetched_files": sorted(fetched_files),
         "circuit_broken": result.get("consecutive_tool_error_turns", 0) >= MAX_CONSECUTIVE_TOOL_ERROR_TURNS,
         "last_message": messages[-1].content if messages else "",
     }
@@ -625,6 +656,7 @@ def _build_panel_graph(tools: list, checkpointer: AsyncRedisSaver, base_thread_i
             base_thread_id,
             state["task_message"],
             state["target_files"],
+            state["diff_shown_files"],
         )
         return {
             "security_findings": outcome["findings"],
@@ -642,6 +674,7 @@ def _build_panel_graph(tools: list, checkpointer: AsyncRedisSaver, base_thread_i
             base_thread_id,
             state["task_message"],
             state["target_files"],
+            state["diff_shown_files"],
         )
         return {
             "performance_findings": outcome["findings"],
@@ -675,6 +708,54 @@ def _build_panel_graph(tools: list, checkpointer: AsyncRedisSaver, base_thread_i
     return graph.compile(checkpointer=checkpointer)
 
 
+def _build_task_message(
+    pr_number: int,
+    repository: str,
+    pull_request: dict,
+    repo_path: Path,
+    target_files: list[str],
+    file_patches: dict[str, str],
+) -> tuple[str, list[str]]:
+    """Build the specialists' initial task message and the list of target-file
+    basenames whose diff was embedded directly in it (diff_shown_files).
+
+    target_files not present in file_patches (GitHub couldn't diff them -- too
+    large or binary, per list_changed_files) are listed separately as files
+    the specialist must fetch in full via fetch_file_contents, same as every
+    target_file was handled before diff-aware fetching existed.
+    """
+    diffed_files = [f for f in target_files if file_patches.get(f)]
+    full_fetch_files = [f for f in target_files if not file_patches.get(f)]
+
+    sections = [
+        f"Review PR #{pr_number} in repository {repository}.",
+        f"Title: {pull_request['title']}",
+        f"Branch: {pull_request['head']['ref']}",
+        f"repo_path to use for all tool calls: {repo_path}",
+    ]
+
+    if diffed_files:
+        diff_blocks = "\n\n".join(
+            f"### {file_path}\n{format_diff_for_review(file_patches[file_path])}" for file_path in diffed_files
+        )
+        sections.append(
+            "DIFFS (shown below -- review directly; call fetch_file_contents on the same file "
+            "only if you need to see code outside these hunks to judge correctness):\n" + diff_blocks
+        )
+
+    if full_fetch_files:
+        sections.append(
+            "FILES REQUIRING FULL FETCH (no diff available -- call fetch_file_contents on each "
+            f"before reviewing): {full_fetch_files}"
+        )
+
+    sections.append("Begin your review now.")
+    task_message = "\n\n".join(sections)
+
+    diff_shown_files = sorted({Path(f).name.lower() for f in diffed_files})
+    return task_message, diff_shown_files
+
+
 async def run_pr_review_agent(pr_metadata: dict, repo_path: Path) -> dict:
     repository = pr_metadata["repository"]["full_name"]
     pull_request = pr_metadata["pull_request"]
@@ -688,14 +769,10 @@ async def run_pr_review_agent(pr_metadata: dict, repo_path: Path) -> dict:
         target_files = list(dict.fromkeys(
             pull_request.get("modified_files", []) + pull_request.get("added_files", [])
         ))
+        file_patches = pull_request.get("file_patches", {})
 
-        task_message = (
-            f"Review PR #{pr_number} in repository {repository}.\n"
-            f"Title: {pull_request['title']}\n"
-            f"Branch: {pull_request['head']['ref']}\n"
-            f"repo_path to use for all tool calls: {repo_path}\n"
-            f"target_files (fetch each of these first, verbatim): {target_files}\n"
-            "Begin your review now."
+        task_message, diff_shown_files = _build_task_message(
+            pr_number, repository, pull_request, repo_path, target_files, file_patches
         )
 
         base_thread_id = _thread_id_for(repository, pr_number, sha)
@@ -711,7 +788,7 @@ async def run_pr_review_agent(pr_metadata: dict, repo_path: Path) -> dict:
             panel = _build_panel_graph(tools, checkpointer, base_thread_id)
 
             panel_result = await panel.ainvoke(
-                {"task_message": task_message, "target_files": target_files},
+                {"task_message": task_message, "target_files": target_files, "diff_shown_files": diff_shown_files},
                 config={
                     "recursion_limit": 25,
                     "configurable": {"thread_id": base_thread_id},

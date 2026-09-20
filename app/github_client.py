@@ -106,35 +106,49 @@ def post_review(
         raise GitHubNotifyError(f"failed to post review on {full_name}#{pr_number}: {exc}") from exc
 
 
-def list_changed_files(full_name: str, pr_number: int) -> tuple[list[str], list[str]]:
-    """Return (modified_files, added_files) for pr_number via the GitHub API.
+def list_changed_files(full_name: str, pr_number: int) -> tuple[list[str], list[str], dict[str, str]]:
+    """Return (modified_files, added_files, file_patches) for pr_number via
+    the GitHub API.
 
     A genuine GitHub pull_request webhook payload never carries a file list
     (unlike simulate_pr.py's payload, which populates it client-side) --
     GitHub only exposes changed files via this separate "list PR files" API.
+
+    file_patches maps filename -> unified diff patch text, for every file
+    where GitHub actually computed one (f.patch is None for files too large
+    or binary to diff -- those are simply absent from the dict, same signal
+    get_diff_commentable_lines below already treats as "no diff available").
+    Reads f.patch off the same File objects this loop already iterates, so
+    this costs no extra GitHub API call.
     """
     try:
         pr = get_repo(full_name).get_pull(pr_number)
         modified_files = []
         added_files = []
+        file_patches = {}
         for f in pr.get_files():
             if f.status == "added":
                 added_files.append(f.filename)
             else:
                 modified_files.append(f.filename)
-        return modified_files, added_files
+            if f.patch:
+                file_patches[f.filename] = f.patch
+        return modified_files, added_files, file_patches
     except Exception as exc:
         raise GitHubNotifyError(f"failed to list changed files for {full_name}#{pr_number}: {exc}") from exc
 
 
-def _commentable_lines_from_patch(patch: str) -> set[int]:
-    """Line numbers (in the file's new/RIGHT-side content) that GitHub will
-    accept an inline review comment on for this file -- i.e. actually part of
-    the diff (added or context lines within a hunk), not just present
-    somewhere in the file. Removed lines don't exist in the new file and are
-    skipped without advancing the new-line counter.
+def _walk_patch_new_lines(patch: str):
+    """Yield (marker, new_line_or_None, text) for every content line in a
+    unified diff patch, tracking the running new/RIGHT-side line number.
+
+    marker is "+"/"-"/" " for added/removed/context lines. new_line is None
+    for removed lines (they don't exist in the new file, so nothing to
+    number) and for any line before the first hunk header. Hunk header lines
+    themselves and the "\\ No newline at end of file" marker are not yielded.
+    Shared by _commentable_lines_from_patch and format_diff_for_review so
+    both agree on exactly one definition of "which line is this."
     """
-    lines: set[int] = set()
     new_line = None
     for line in patch.splitlines():
         match = _HUNK_HEADER_RE.match(line)
@@ -144,10 +158,57 @@ def _commentable_lines_from_patch(patch: str) -> set[int]:
         if new_line is None or line.startswith("\\"):
             continue
         if line.startswith("-"):
+            yield "-", None, line[1:]
             continue
-        lines.add(new_line)
+        marker = "+" if line.startswith("+") else " "
+        text = line[1:] if line[:1] in ("+", " ") else line
+        yield marker, new_line, text
         new_line += 1
-    return lines
+
+
+def _commentable_lines_from_patch(patch: str) -> set[int]:
+    """Line numbers (in the file's new/RIGHT-side content) that GitHub will
+    accept an inline review comment on for this file -- i.e. actually part of
+    the diff (added or context lines within a hunk), not just present
+    somewhere in the file. Removed lines don't exist in the new file and are
+    skipped without advancing the new-line counter.
+    """
+    return {new_line for marker, new_line, _ in _walk_patch_new_lines(patch) if marker != "-"}
+
+
+def format_diff_for_review(patch: str) -> str:
+    """Render a unified diff patch with explicit new-file line numbers on
+    every context/added line (format: 'N | code'), so a specialist can copy
+    an exact SUGGESTION line number directly from the diff without a
+    separate fetch_file_contents call -- same "N | code" convention
+    fetch_file_contents itself uses, so a line number is interchangeable
+    regardless of which source it came from.
+
+    Removed lines don't exist in the new file (not a valid SUGGESTION
+    target, per _commentable_lines_from_patch above) and are rendered with a
+    '-' marker and no line number rather than being dropped, since a
+    reviewer still needs to see what was removed to judge correctness.
+    Hunk headers ("@@ ... @@") are kept verbatim (not run through
+    _walk_patch_new_lines, which deliberately doesn't yield them) so gaps
+    between hunks in the same file stay visible.
+    """
+    new_line = None
+    lines_out = []
+    for line in patch.splitlines():
+        match = _HUNK_HEADER_RE.match(line)
+        if match:
+            new_line = int(match.group(1))
+            lines_out.append(line)
+            continue
+        if new_line is None or line.startswith("\\"):
+            continue
+        if line.startswith("-"):
+            lines_out.append(f"    - | {line[1:]}")
+            continue
+        text = line[1:] if line[:1] in ("+", " ") else line
+        lines_out.append(f"{new_line:>5} | {text}")
+        new_line += 1
+    return "\n".join(lines_out)
 
 
 def get_diff_commentable_lines(full_name: str, pr_number: int) -> dict[str, set[int]]:

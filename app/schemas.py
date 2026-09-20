@@ -20,6 +20,7 @@ class PullRequest(BaseModel):
     head: Head
     modified_files: list[str] = []
     added_files: list[str] = []
+    file_patches: dict[str, str] = {}
 
 
 class PullRequestEvent(BaseModel):

@@ -156,9 +156,10 @@ def process_pr_review_task(event_data: dict) -> dict:
     # it would have nothing to review.
     if not pull_request.get("modified_files") and not pull_request.get("added_files"):
         try:
-            modified_files, added_files = list_changed_files(repository, pr_number)
+            modified_files, added_files, file_patches = list_changed_files(repository, pr_number)
             pull_request["modified_files"] = modified_files
             pull_request["added_files"] = added_files
+            pull_request["file_patches"] = file_patches
         except GitHubNotifyError:
             logger.exception(
                 "Failed to fetch changed files for %s#%s; proceeding with an empty target_files list",

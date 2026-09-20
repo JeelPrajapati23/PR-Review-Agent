@@ -10,6 +10,7 @@ from app.agent import (
     SpecialistFindings,
     _build_inline_comments,
     _build_panel_graph,
+    _combine_fetched_files,
     _fetched_file_names,
     _format_review,
     _is_grounded,
@@ -95,6 +96,23 @@ def test_fetched_file_names_ignores_non_fetch_tool_calls():
     ]
 
     assert _fetched_file_names(messages) == set()
+
+
+def test_combine_fetched_files_includes_diff_shown_files_without_a_fetch_call():
+    # No fetch_file_contents call at all -- the file was reviewed via its
+    # diff, embedded directly in the task message (see _build_task_message).
+    messages = [AIMessage(content="Reviewed the diff, no issues found.")]
+
+    assert _combine_fetched_files(messages, ["main.py"]) == {"main.py"}
+
+
+def test_combine_fetched_files_unions_diff_shown_and_actually_fetched():
+    messages = [
+        AIMessage(content="", tool_calls=[_fetch_call("call_1", "app/helper.py")]),
+        ToolMessage(content="def helper(): ...", tool_call_id="call_1"),
+    ]
+
+    assert _combine_fetched_files(messages, ["main.py"]) == {"main.py", "helper.py"}
 
 
 def test_is_grounded_true_when_review_references_a_fetched_file():
@@ -208,7 +226,9 @@ def test_panel_graph_runs_sequential_topology_and_populates_state():
         file_path="app/main.py", line=12, suggested_code="items[:n]", comment="O(n^2) loop"
     )
 
-    async def fake_run_specialist(persona_key, _prompt, _tools, _checkpointer, _base_thread_id, _task_message, _target_files):
+    async def fake_run_specialist(
+        persona_key, _prompt, _tools, _checkpointer, _base_thread_id, _task_message, _target_files, _diff_shown_files
+    ):
         call_order.append(persona_key)
         if persona_key == "security":
             return {
@@ -256,7 +276,7 @@ def test_panel_graph_runs_sequential_topology_and_populates_state():
     async def _run():
         graph = _build_panel_graph(tools, checkpointer, "test-thread")
         return await graph.ainvoke(
-            {"task_message": "Review PR #1", "target_files": ["app/main.py"]},
+            {"task_message": "Review PR #1", "target_files": ["app/main.py"], "diff_shown_files": []},
             config={"configurable": {"thread_id": "test-thread"}},
         )
 

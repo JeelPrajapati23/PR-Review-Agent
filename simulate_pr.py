@@ -50,7 +50,7 @@ def _build_payload(args: argparse.Namespace) -> dict:
     repo = get_repo(args.full_name)
     pr = repo.get_pull(args.pr_number)
 
-    modified_files, added_files = list_changed_files(args.full_name, args.pr_number)
+    modified_files, added_files, file_patches = list_changed_files(args.full_name, args.pr_number)
 
     return {
         "action": "opened",
@@ -60,6 +60,7 @@ def _build_payload(args: argparse.Namespace) -> dict:
             "draft": pr.draft,
             "modified_files": modified_files,
             "added_files": added_files,
+            "file_patches": file_patches,
             "head": {"ref": pr.head.ref, "sha": pr.head.sha},
         },
         "repository": {
