@@ -7,3 +7,4 @@ venv/
 app/workspace/
 *.pem
 webhook_secret.txt
+CLAUDE.md
