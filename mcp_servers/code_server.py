@@ -2,7 +2,7 @@ import ast
 from pathlib import Path
 
 from charset_normalizer import from_bytes
-from fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("PR-Code-Server")
 

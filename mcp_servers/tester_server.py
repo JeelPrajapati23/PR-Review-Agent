@@ -5,7 +5,7 @@ import sys
 import time
 from pathlib import Path
 
-from fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP
 
 
 def _dbg(msg: str) -> None:
