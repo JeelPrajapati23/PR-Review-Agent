@@ -1,0 +1,15 @@
+{
+  "id": "perf-02-off-by-one-pagination",
+  "category": "performance",
+  "judged_at_utc": "2026-09-21T05:31:52.898032+00:00",
+  "wall_clock_seconds": 17.8,
+  "judge_model": "gemini-3.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review correctly identified the off-by-one error in pagination.py where the end index calculation causes the last item of each page to be omitted. This was appropriately placed under 'Security & Correctness Issues' and treated with appropriate severity. The additional finding regarding input validation is a valid edge case and not a false positive."
+  }
+}

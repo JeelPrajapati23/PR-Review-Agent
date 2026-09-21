@@ -1,0 +1,15 @@
+{
+  "id": "struct-04-deep-nesting-guard-clauses",
+  "category": "structural",
+  "judged_at_utc": "2026-09-21T05:33:44.329043+00:00",
+  "wall_clock_seconds": 50.5,
+  "judge_model": "gemini-3.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": false,
+    "section_correct": false,
+    "severity_matched": false,
+    "false_positive_count": 0,
+    "reasoning": "The review completely missed the structural issue regarding the six levels of nested if/else statements ('arrow code') in order_validation.py. Instead, it only pointed out a minor edge case regarding missing type checks for non-dictionary inputs."
+  }
+}

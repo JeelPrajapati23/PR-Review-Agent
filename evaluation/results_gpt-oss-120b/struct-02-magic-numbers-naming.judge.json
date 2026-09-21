@@ -1,0 +1,15 @@
+{
+  "id": "struct-02-magic-numbers-naming",
+  "category": "structural",
+  "judged_at_utc": "2026-09-21T05:33:24.827020+00:00",
+  "wall_clock_seconds": 13.5,
+  "judge_model": "gemini-3.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review correctly identified the magic numbers (0.925, 1.13, 42, and 5) in checkout_pricing.py and noted that they reduce readability and maintainability. This was appropriately placed under Architectural Suggestions with no false positives."
+  }
+}

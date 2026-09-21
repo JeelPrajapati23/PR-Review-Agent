@@ -1,0 +1,23 @@
+{
+  "id": "perf-04-faulty-memoization-key",
+  "category": "performance",
+  "target_specialist": "performance_architect",
+  "expected_findings": {
+    "must_flag_file": "pricing_cache.py",
+    "issue_keywords": [
+      "cache key",
+      "memoization",
+      "stale",
+      "incorrect result"
+    ],
+    "severity": "high"
+  },
+  "reviewed_at_utc": "2026-09-21T05:11:21.799507+00:00",
+  "wall_clock_seconds": 114.4,
+  "agent_result": {
+    "repository": "octocat/pr-review-eval-fixture",
+    "pr_number": 900001,
+    "status": "completed",
+    "summary": "## Summary\nReviewed src/pricing_cache.py for cache key correctness and thread\u2011safety; identified flawed memoization key and missing synchronization.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nNone found.\n\n## Security & Correctness Issues\nIn src/pricing_cache.py, the memoization cache is keyed only by the `segment` string (lines 4 and 10). This causes incorrect reuse of a previously computed discounted price when the same segment is queried with a different `base_price` (or a different discount function), leading to stale and potentially insecure results. The cache key should incorporate `base_price` (and optionally the discount function) to ensure each unique calculation is stored separately. Additionally, the module\u2011level dictionary used for caching is accessed without any synchronization, which can cause race conditions and data corruption in multithreaded environments.\n\n## Architectural Suggestions\nNone found.\n\n## Validation Outcome\nNone found."
+  }
+}

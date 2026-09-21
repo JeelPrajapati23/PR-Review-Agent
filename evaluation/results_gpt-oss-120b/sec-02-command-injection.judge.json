@@ -1,0 +1,15 @@
+{
+  "id": "sec-02-command-injection",
+  "category": "security",
+  "judged_at_utc": "2026-09-21T05:30:44.705672+00:00",
+  "wall_clock_seconds": 10.8,
+  "judge_model": "gemini-3.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review correctly identified the command injection vulnerability in archive_tool.py caused by using shell=True with an interpolated directory_name. It placed this finding in the correct section (Security & Correctness Issues) and treated it with appropriate severity. No false positives were introduced."
+  }
+}

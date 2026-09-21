@@ -1,0 +1,15 @@
+{
+  "id": "perf-01-quadratic-duplicate-check",
+  "category": "performance",
+  "judged_at_utc": "2026-09-21T05:31:46.896515+00:00",
+  "wall_clock_seconds": 3.9,
+  "judge_model": "gemini-3.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review perfectly identified the O(n^2) nested loop performance issue in dedupe.py, correctly noting its impact on large import batches. The finding was correctly placed in the Performance Observations section, and no false positives were generated."
+  }
+}

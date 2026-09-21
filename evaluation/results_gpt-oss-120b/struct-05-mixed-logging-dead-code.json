@@ -1,0 +1,23 @@
+{
+  "id": "struct-05-mixed-logging-dead-code",
+  "category": "structural",
+  "target_specialist": "synthesizer_general",
+  "expected_findings": {
+    "must_flag_file": "notification_sender.py",
+    "issue_keywords": [
+      "dead code",
+      "commented-out",
+      "print",
+      "inconsistent logging"
+    ],
+    "severity": "low"
+  },
+  "reviewed_at_utc": "2026-09-21T05:03:05.632670+00:00",
+  "wall_clock_seconds": 200.2,
+  "agent_result": {
+    "repository": "octocat/pr-review-eval-fixture",
+    "pr_number": 900015,
+    "status": "completed",
+    "summary": "## Summary\nReviewed src/notification_sender.py for security, correctness, and architectural concerns, identifying PII exposure, weak email validation, inconsistent logging, and dead commented\u2011out code.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nNone found.\n\n## Security & Correctness Issues\nIn src/notification_sender.py lines 8 and 22 the function prints the recipient email and full notification message, exposing personally\u2011identifiable information (PII) in stdout logs that may be captured by downstream systems. Additionally, the email validation on lines 18\u201120 only checks for a non\u2011empty string containing \"@\", which is insufficient and could allow malformed addresses that may be exploited for email header injection attacks.\n\n## Architectural Suggestions\nIn src/notification_sender.py the module mixes direct `print` statements with the structured logging framework, creating inconsistent log handling. It also retains a large block of commented\u2011out legacy code, which constitutes dead code and reduces readability.\n\nBoth issues should be resolved by removing the `print` calls in favor of the logger and deleting the commented\u2011out block.\n\n## Validation Outcome\nNot run: no validation suite required for this structural review."
+  }
+}

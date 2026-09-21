@@ -1,0 +1,23 @@
+{
+  "id": "perf-05-race-condition-counter",
+  "category": "performance",
+  "target_specialist": "performance_architect",
+  "expected_findings": {
+    "must_flag_file": "request_counter.py",
+    "issue_keywords": [
+      "race condition",
+      "thread-safe",
+      "lock",
+      "concurren"
+    ],
+    "severity": "medium"
+  },
+  "reviewed_at_utc": "2026-09-21T05:13:18.439586+00:00",
+  "wall_clock_seconds": 207.5,
+  "agent_result": {
+    "repository": "octocat/pr-review-eval-fixture",
+    "pr_number": 900001,
+    "status": "completed",
+    "summary": "## Summary\nReviewed src/request_counter.py for concurrency safety and resource management. Identified an unsynchronized global counter leading to a race condition and missing synchronization imports (security issue), and noted that stale keys are never removed, causing unbounded dictionary growth (performance issue).\n\n## Performance Observations\nIn src/request_counter.py the global dictionary `_counts` retains keys whose count has dropped to zero. Over time this leads to unbounded growth of the dictionary, causing unnecessary memory consumption and potential performance degradation.\n\n## Edge Cases\nNone found.\n\n## Security & Correctness Issues\nIn src/request_counter.py the global dictionary `_counts` is accessed and mutated without any synchronization primitives. This race condition can produce inaccurate request counts in multi\u2011threaded or async environments, allowing the rate\u2011limiter to be bypassed and constituting a Broken Access Control vulnerability. The file also lacks any import of synchronization primitives, preventing straightforward addition of proper locking.\n\n## Architectural Suggestions\nNone found.\n\n## Validation Outcome\nNone found."
+  }
+}

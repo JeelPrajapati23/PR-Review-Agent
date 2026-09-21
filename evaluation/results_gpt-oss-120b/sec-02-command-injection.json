@@ -1,0 +1,22 @@
+{
+  "id": "sec-02-command-injection",
+  "category": "security",
+  "target_specialist": "security_warden",
+  "expected_findings": {
+    "must_flag_file": "archive_tool.py",
+    "issue_keywords": [
+      "command injection",
+      "shell=true",
+      "shell injection"
+    ],
+    "severity": "high"
+  },
+  "reviewed_at_utc": "2026-09-20T17:25:53.844276+00:00",
+  "wall_clock_seconds": 164.0,
+  "agent_result": {
+    "repository": "octocat/pr-review-eval-fixture",
+    "pr_number": 900002,
+    "status": "completed",
+    "summary": "## Summary\nReviewed src/archive_tool.py where a subprocess command is constructed from a user\u2011provided directory name and executed with shell=True, exposing both security and correctness concerns.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nIn src/archive_tool.py (lines 7\u20118), an empty `directory_name` results in the command `zip -r .zip ` which unintentionally archives the current working directory. Additionally, directory names containing spaces or special characters can produce malformed commands, leading to silent failures or unexpected behavior.\n\n## Security & Correctness Issues\nIn src/archive_tool.py (lines 7\u20118), the code builds a shell command string using the user\u2011supplied `directory_name` and executes it with `subprocess.run(..., shell=True)`. This allows command injection (OWASP\u2011A01:2021) because an attacker can inject additional commands via a crafted directory name (e.g., \"reports; rm -rf /\"). Using `shell=True` is unnecessary and unsafe.\n\n## Architectural Suggestions\nNone found.\n\n## Validation Outcome\nSecurity Warden: Validation notes: None found. Performance & Logic Architect: The validation suite ran and all tests passed, but it only checks that subprocess.run is called and that the exit code is returned; it does not include tests for empty or specially\u2011crafted directory names."
+  }
+}

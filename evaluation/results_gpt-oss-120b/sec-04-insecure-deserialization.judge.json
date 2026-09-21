@@ -1,0 +1,15 @@
+{
+  "id": "sec-04-insecure-deserialization",
+  "category": "security",
+  "judged_at_utc": "2026-09-21T05:31:15.035944+00:00",
+  "wall_clock_seconds": 18.0,
+  "judge_model": "gemini-3.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review correctly identifies the insecure deserialization vulnerability using pickle in cache_layer.py under the 'Security & Correctness Issues' section. It accurately notes that this can lead to arbitrary code execution, matching the high severity of the ground truth."
+  }
+}

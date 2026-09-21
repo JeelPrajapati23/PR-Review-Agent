@@ -1,0 +1,23 @@
+{
+  "id": "struct-04-deep-nesting-guard-clauses",
+  "category": "structural",
+  "target_specialist": "synthesizer_general",
+  "expected_findings": {
+    "must_flag_file": "order_validation.py",
+    "issue_keywords": [
+      "deep nesting",
+      "guard clause",
+      "early return",
+      "arrow"
+    ],
+    "severity": "low"
+  },
+  "reviewed_at_utc": "2026-09-21T05:00:35.163010+00:00",
+  "wall_clock_seconds": 150.5,
+  "agent_result": {
+    "repository": "octocat/pr-review-eval-fixture",
+    "pr_number": 900014,
+    "status": "completed",
+    "summary": "## Summary\nThe review examined src/order_validation.py for edge case handling and identified a missing type check that could cause a TypeError when non-dictionary inputs are provided.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nIn src/order_validation.py (line 6), the function only checks for None before accessing the order as a dictionary. If a non-dict (e.g., list, string, or int) is passed, a TypeError will be raised when attempting order[\"customer_id\"]. This unhandled edge case can cause the service to crash instead of returning a graceful validation error.\n\n## Security & Correctness Issues\nNone found.\n\n## Architectural Suggestions\nNone found.\n\n## Validation Outcome\nNot run: security review did not require execution of validation suite. None found."
+  }
+}

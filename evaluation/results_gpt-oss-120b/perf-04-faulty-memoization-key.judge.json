@@ -1,0 +1,15 @@
+{
+  "id": "perf-04-faulty-memoization-key",
+  "category": "performance",
+  "judged_at_utc": "2026-09-21T05:32:44.602243+00:00",
+  "wall_clock_seconds": 15.2,
+  "judge_model": "gemini-3.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review correctly identifies that the cache key only uses the segment and ignores the base_price, leading to incorrect cached results. It appropriately places this under 'Security & Correctness Issues' due to the correctness impact, and correctly flags a potential thread-safety issue as well without introducing false positives."
+  }
+}

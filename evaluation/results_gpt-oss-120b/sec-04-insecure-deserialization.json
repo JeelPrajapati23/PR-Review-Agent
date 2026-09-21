@@ -1,0 +1,23 @@
+{
+  "id": "sec-04-insecure-deserialization",
+  "category": "security",
+  "target_specialist": "security_warden",
+  "expected_findings": {
+    "must_flag_file": "cache_layer.py",
+    "issue_keywords": [
+      "pickle",
+      "insecure deserialization",
+      "arbitrary code execution",
+      "untrusted"
+    ],
+    "severity": "high"
+  },
+  "reviewed_at_utc": "2026-09-20T17:43:11.520145+00:00",
+  "wall_clock_seconds": 183.4,
+  "agent_result": {
+    "repository": "octocat/pr-review-eval-fixture",
+    "pr_number": 900004,
+    "status": "completed",
+    "summary": "## Summary\nReviewed src/cache_layer.py for security, correctness, and performance concerns related to caching logic.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nIn src/cache_layer.py, `load_cached_object` returns `None` both when the cache file is missing and when the cached value is legitimately `None`, preventing reliable detection of cache misses.\n\n## Security & Correctness Issues\nIn src/cache_layer.py, using `pickle` for serialization (lines 9\u201110 and 19\u201120) introduces insecure deserialization, allowing arbitrary code execution if a malicious `.cache` file is loaded. Additionally, the cache file path is built directly from the user\u2011supplied `key` (lines 8 and 16) without validation, enabling path\u2011traversal attacks that could read or overwrite files outside the intended cache directory. Concurrent writes to the same cache file can produce partially written pickle files, leading to corrupted cache data and potential crashes.\n\n## Architectural Suggestions\nIn src/cache_layer.py, the `os` module is not imported even though it is required for implementing key validation, causing the intended validation step to be unavailable.\n\n## Validation Outcome\nNone found."
+  }
+}

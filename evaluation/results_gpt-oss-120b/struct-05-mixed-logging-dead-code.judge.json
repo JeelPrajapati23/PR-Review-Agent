@@ -1,0 +1,15 @@
+{
+  "id": "struct-05-mixed-logging-dead-code",
+  "category": "structural",
+  "judged_at_utc": "2026-09-21T05:34:34.879904+00:00",
+  "wall_clock_seconds": 6.1,
+  "judge_model": "gemini-3.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review perfectly identified the injected issue, specifically pointing out the mixture of print statements with the logging framework and the presence of the large block of commented-out legacy code. These findings were correctly placed under 'Architectural Suggestions' with an appropriate low-severity tone, and the additional security observations regarding PII and email validation are realistic and not fabricated."
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "struct-01-duplicated-validation-logic",
+  "category": "structural",
+  "target_specialist": "synthesizer_general",
+  "expected_findings": {
+    "must_flag_file": "signup_validation.py",
+    "issue_keywords": [
+      "duplicat",
+      "extract",
+      "shared helper",
+      "dry"
+    ],
+    "severity": "low"
+  },
+  "reviewed_at_utc": "2026-09-20T18:36:57.167527+00:00",
+  "wall_clock_seconds": 174.4,
+  "agent_result": {
+    "repository": "octocat/pr-review-eval-fixture",
+    "pr_number": 900011,
+    "status": "completed",
+    "summary": "## Summary\nReviewed src/signup_validation.py and identified duplicated email validation logic; recommend extracting a common helper to eliminate redundancy.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nNone found.\n\n## Security & Correctness Issues\nNone found.\n\n## Architectural Suggestions\nIn src/signup_validation.py, the email validation logic is duplicated in `validate_email_signup` (lines 7\u201117) and `validate_email_login` (lines 20\u201130). The repeated checks (None check, strip, length checks, pattern match) should be refactored into a shared helper function to adhere to the DRY principle and reduce maintenance risk.\n\n## Validation Outcome\nNot run: validation suite not executed."
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "id": "struct-03-silent-exception-handling",
+  "category": "structural",
+  "judged_at_utc": "2026-09-21T05:33:38.331269+00:00",
+  "wall_clock_seconds": 3.3,
+  "judge_model": "gemini-3.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review perfectly identifies both parts of the injected issue: the bare `except: pass` in `parse_row` that silently swallows exceptions, and the inconsistent use of `print` instead of the module's logger. These findings were correctly routed to the 'Security & Correctness Issues' and 'Architectural Suggestions' sections respectively, with no false positives."
+  }
+}

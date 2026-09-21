@@ -1,0 +1,15 @@
+{
+  "id": "perf-05-race-condition-counter",
+  "category": "performance",
+  "judged_at_utc": "2026-09-21T05:32:59.830774+00:00",
+  "wall_clock_seconds": 16.4,
+  "judge_model": "gemini-3.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review correctly identifies the race condition in `request_counter.py` due to lack of synchronization, placing it under 'Security & Correctness Issues'. The additional observation regarding unbounded dictionary growth is a valid performance concern for a basic counter implementation and not a false positive."
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "perf-03-exponential-fibonacci",
+  "category": "performance",
+  "target_specialist": "performance_architect",
+  "expected_findings": {
+    "must_flag_file": "fibonacci.py",
+    "issue_keywords": [
+      "exponential",
+      "memoiz",
+      "recursion",
+      "o(2^n)"
+    ],
+    "severity": "medium"
+  },
+  "reviewed_at_utc": "2026-09-20T18:30:14.660783+00:00",
+  "wall_clock_seconds": 203.5,
+  "agent_result": {
+    "repository": "octocat/pr-review-eval-fixture",
+    "pr_number": 900008,
+    "status": "completed",
+    "summary": "## Summary\nReviewed src/fibonacci.py and identified exponential recursion causing performance and security risks, as well as missing validation for negative inputs.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nIn src/fibonacci.py (lines 4\u20118), the function does not handle negative input values (e.g., fibonacci(-1) returns -1) and can exceed the maximum recursion depth for large n, leading to RecursionError.\n\n## Security & Correctness Issues\nIn src/fibonacci.py (lines 4\u20118), the na\u00efve recursive implementation has exponential time complexity, which can cause high CPU usage and deep call stacks, presenting a denial\u2011of\u2011service risk when exposed to untrusted input. Additionally, the function lacks validation for non\u2011negative n, returning unintended results for negative inputs.\n\n## Architectural Suggestions\nNone found.\n\n## Validation Outcome\nNone found. The test suite passed (2 passed) but does not cover negative inputs or large n where recursion would fail. No validation failures were reported by the suite."
+  }
+}

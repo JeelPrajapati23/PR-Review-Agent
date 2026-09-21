@@ -1,0 +1,15 @@
+{
+  "id": "struct-01-duplicated-validation-logic",
+  "category": "structural",
+  "judged_at_utc": "2026-09-21T05:33:16.259033+00:00",
+  "wall_clock_seconds": 8.6,
+  "judge_model": "gemini-3.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": true,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review perfectly identified the duplicated email validation logic in `signup_validation.py` and recommended extracting it into a shared helper to adhere to the DRY principle. This was correctly placed under 'Architectural Suggestions' with no false positives."
+  }
+}

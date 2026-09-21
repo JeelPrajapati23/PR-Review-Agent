@@ -1,0 +1,15 @@
+{
+  "id": "perf-03-exponential-fibonacci",
+  "category": "performance",
+  "judged_at_utc": "2026-09-21T05:32:16.675455+00:00",
+  "wall_clock_seconds": 27.9,
+  "judge_model": "gemini-3.5-flash",
+  "error": null,
+  "verdict": {
+    "true_positive_caught": true,
+    "section_correct": false,
+    "severity_matched": true,
+    "false_positive_count": 0,
+    "reasoning": "The review successfully identified the naive recursive implementation and its exponential time complexity. However, it failed to route this performance issue to the 'Performance Observations' section (which was left empty), instead placing it under 'Security & Correctness Issues' and 'Edge Cases'."
+  }
+}

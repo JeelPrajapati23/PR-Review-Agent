@@ -1,0 +1,23 @@
+{
+  "id": "struct-02-magic-numbers-naming",
+  "category": "structural",
+  "target_specialist": "synthesizer_general",
+  "expected_findings": {
+    "must_flag_file": "checkout_pricing.py",
+    "issue_keywords": [
+      "magic number",
+      "naming",
+      "readability",
+      "named constant"
+    ],
+    "severity": "low"
+  },
+  "reviewed_at_utc": "2026-09-21T05:22:30.591219+00:00",
+  "wall_clock_seconds": 36.5,
+  "agent_result": {
+    "repository": "octocat/pr-review-eval-fixture",
+    "pr_number": 900001,
+    "status": "completed",
+    "summary": "## Summary\nReviewed src/checkout_pricing.py and identified hard\u2011coded numeric literals (magic numbers) on lines 5\u20118 that should be replaced with descriptive constants.\n\n## Performance Observations\nNone found.\n\n## Edge Cases\nNone found.\n\n## Security & Correctness Issues\nNone found.\n\n## Architectural Suggestions\nIn src/checkout_pricing.py:\n- Line 5 uses the literal `0.925` as a discount multiplier.\n- Line 6 uses the literal `1.13` as a tax multiplier.\n- Line 7 compares variable `c` against the literal `42`, the bulk\u2011order threshold.\n- Line 8 subtracts the literal `5` as a bulk discount amount.\nThese magic numbers reduce readability and maintainability; extract each into well\u2011named constants defined at the top of the file.\n\n## Validation Outcome\nNone found."
+  }
+}

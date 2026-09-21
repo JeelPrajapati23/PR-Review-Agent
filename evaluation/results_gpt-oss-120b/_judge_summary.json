@@ -1,0 +1,169 @@
+{
+  "rows": [
+    {
+      "id": "sec-01-sql-injection",
+      "category": "security",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identifies the SQL injection vulnerability in `find_user_by_username` due to string concatenation and places it in the 'Security & Correctness Issues' section. The severity is appropriately matched, and the edge case mentioned is a direct consequence of the same issue, resulting in zero false positives."
+      }
+    },
+    {
+      "id": "sec-02-command-injection",
+      "category": "security",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identified the command injection vulnerability in archive_tool.py caused by using shell=True with an interpolated directory_name. It placed this finding in the correct section (Security & Correctness Issues) and treated it with appropriate severity. No false positives were introduced."
+      }
+    },
+    {
+      "id": "sec-03-hardcoded-secret",
+      "category": "security",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review perfectly identified both aspects of the security issue: the hardcoded API key and the logging of the raw credit card number and API key. These were correctly placed in the Security & Correctness section, and the other findings regarding httpx client management and URL resolution are valid technical observations rather than false positives."
+      }
+    },
+    {
+      "id": "sec-04-insecure-deserialization",
+      "category": "security",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identifies the insecure deserialization vulnerability using pickle in cache_layer.py under the 'Security & Correctness Issues' section. It accurately notes that this can lead to arbitrary code execution, matching the high severity of the ground truth."
+      }
+    },
+    {
+      "id": "sec-05-path-traversal",
+      "category": "security",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identifies the path traversal vulnerability in `read_user_file` within `file_server.py`, placing it in the appropriate \"Security & Correctness Issues\" section. It accurately describes the issue and provides a correct remediation strategy without introducing any false positives."
+      }
+    },
+    {
+      "id": "perf-01-quadratic-duplicate-check",
+      "category": "performance",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review perfectly identified the O(n^2) nested loop performance issue in dedupe.py, correctly noting its impact on large import batches. The finding was correctly placed in the Performance Observations section, and no false positives were generated."
+      }
+    },
+    {
+      "id": "perf-02-off-by-one-pagination",
+      "category": "performance",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identified the off-by-one error in pagination.py where the end index calculation causes the last item of each page to be omitted. This was appropriately placed under 'Security & Correctness Issues' and treated with appropriate severity. The additional finding regarding input validation is a valid edge case and not a false positive."
+      }
+    },
+    {
+      "id": "perf-03-exponential-fibonacci",
+      "category": "performance",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": false,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review successfully identified the naive recursive implementation and its exponential time complexity. However, it failed to route this performance issue to the 'Performance Observations' section (which was left empty), instead placing it under 'Security & Correctness Issues' and 'Edge Cases'."
+      }
+    },
+    {
+      "id": "perf-04-faulty-memoization-key",
+      "category": "performance",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identifies that the cache key only uses the segment and ignores the base_price, leading to incorrect cached results. It appropriately places this under 'Security & Correctness Issues' due to the correctness impact, and correctly flags a potential thread-safety issue as well without introducing false positives."
+      }
+    },
+    {
+      "id": "perf-05-race-condition-counter",
+      "category": "performance",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identifies the race condition in `request_counter.py` due to lack of synchronization, placing it under 'Security & Correctness Issues'. The additional observation regarding unbounded dictionary growth is a valid performance concern for a basic counter implementation and not a false positive."
+      }
+    },
+    {
+      "id": "struct-01-duplicated-validation-logic",
+      "category": "structural",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review perfectly identified the duplicated email validation logic in `signup_validation.py` and recommended extracting it into a shared helper to adhere to the DRY principle. This was correctly placed under 'Architectural Suggestions' with no false positives."
+      }
+    },
+    {
+      "id": "struct-02-magic-numbers-naming",
+      "category": "structural",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review correctly identified the magic numbers (0.925, 1.13, 42, and 5) in checkout_pricing.py and noted that they reduce readability and maintainability. This was appropriately placed under Architectural Suggestions with no false positives."
+      }
+    },
+    {
+      "id": "struct-03-silent-exception-handling",
+      "category": "structural",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review perfectly identifies both parts of the injected issue: the bare `except: pass` in `parse_row` that silently swallows exceptions, and the inconsistent use of `print` instead of the module's logger. These findings were correctly routed to the 'Security & Correctness Issues' and 'Architectural Suggestions' sections respectively, with no false positives."
+      }
+    },
+    {
+      "id": "struct-04-deep-nesting-guard-clauses",
+      "category": "structural",
+      "verdict": {
+        "true_positive_caught": false,
+        "section_correct": false,
+        "severity_matched": false,
+        "false_positive_count": 0,
+        "reasoning": "The review completely missed the structural issue regarding the six levels of nested if/else statements ('arrow code') in order_validation.py. Instead, it only pointed out a minor edge case regarding missing type checks for non-dictionary inputs."
+      }
+    },
+    {
+      "id": "struct-05-mixed-logging-dead-code",
+      "category": "structural",
+      "verdict": {
+        "true_positive_caught": true,
+        "section_correct": true,
+        "severity_matched": true,
+        "false_positive_count": 0,
+        "reasoning": "The review perfectly identified the injected issue, specifically pointing out the mixture of print statements with the logging framework and the presence of the large block of commented-out legacy code. These findings were correctly placed under 'Architectural Suggestions' with an appropriate low-severity tone, and the additional security observations regarding PII and email validation are realistic and not fabricated."
+      }
+    }
+  ]
+}
