@@ -6,19 +6,16 @@ Built around two constraints that matter in production, not just in a demo: a **
 
 ## Evaluation results
 
-Measured against a 15-fixture golden dataset of deliberately injected bugs (SQL injection, race conditions, off-by-one errors, etc.), graded by an independent LLM judge:
+Measured against a 15-fixture golden dataset of deliberately injected bugs (SQL injection, race conditions, off-by-one errors, etc.), graded by an independent LLM judge (Gemini). Current results, on Groq's `openai/gpt-oss-120b`:
 
-| Category | Recall |
-|---|---|
-| Security | 5/5 (100%) |
-| Performance | 5/5 (100%) |
-| Structural | 5/5 (100%) |
-| **Overall** | **15/15 (100%)** |
+| Category | Recall | Precision | F2 |
+|---|---|---|---|
+| Security | 5/5 (100%) | 1.000 | 1.000 |
+| Performance | 5/5 (100%) | 1.000 | 1.000 |
+| Structural | 4/5 (80%) | 1.000 | 0.833 |
+| **Overall** | **14/15 (93.3%)** | **1.000** | **0.946** |
 
-- **Precision:** ~71% (6 false positives across 15 fixtures)
-- **F2 score** (recall weighted 4x over precision — a missed vulnerability costs more than a false positive): **≈0.93**
-
-These results were measured against the review panel running on Groq's `llama-3.3-70b-versatile`, since deprecated and replaced by `openai/gpt-oss-120b` (see [Tech stack](#tech-stack)) — they have not yet been re-run on the current model.
+Zero false positives across all 15 fixtures. F2 weights recall 4x over precision, since a missed vulnerability costs more than an extra false positive.
 
 See [`evaluation/`](evaluation/) for the full harness and methodology.
 
@@ -46,7 +43,7 @@ flowchart TD
         LOCK{"Redis dedup lock<br/>SET NX EX 900"}
     end
 
-    subgraph REDIS["Redis (Managed, NoCluster)"]
+    subgraph REDIS["Redis"]
         RQ[(Celery broker/backend)]
         RCP[(LangGraph checkpoints<br/>per-sha sub-threads)]
         RTEL[(Token usage & budget<br/>usage:groq:*)]
@@ -60,8 +57,8 @@ flowchart TD
     end
 
     subgraph AGENT["LangGraph Review Panel — app/agent.py"]
-        SEC["Security Warden<br/>Groq llama-3.3-70b"]
-        PERF["Performance & Logic Architect<br/>Groq llama-3.3-70b"]
+        SEC["Security Warden<br/>Groq gpt-oss-120b"]
+        PERF["Performance & Logic Architect<br/>Groq gpt-oss-120b"]
         SYN["Synthesizer<br/>structured merge"]
         GROUND{"_is_grounded()<br/>circuit breakers ok?"}
         SEC --> PERF --> SYN --> GROUND
@@ -145,7 +142,7 @@ tests/          Fast, fully-mocked test suite (pytest)
 - **LLM:** Groq (`openai/gpt-oss-120b`), Gemini (`gemini-3.5-flash`, evaluation judge only)
 - **Tool protocol:** MCP (Model Context Protocol), stdio transport
 - **GitHub integration:** PyGithub, GitHub App authentication (short-lived installation tokens, not a static PAT)
-- **Deployment:** Docker Compose on a shared Oracle Cloud "Always Free" VM, behind another project's Caddy instance (automatic HTTPS), GitHub Actions (SSH-triggered redeploy)
+- **Deployment:** Docker Compose on an Oracle Cloud "Always Free" VM, Caddy (automatic HTTPS), GitHub Actions (SSH-triggered redeploy)
 
 ## Getting started
 
@@ -219,7 +216,7 @@ Every LLM call the panel makes is instrumented two ways:
 
 ## Deployment
 
-Deployed via `docker-compose.yml` (`fastapi_web`, `celery_worker`, `redis_broker` — Redis 8, for both the Celery broker and the LangGraph checkpointer's RediSearch/RedisJSON module requirement) on an Oracle Cloud "Always Free" VM at `pr-review-agent.live`. The VM is shared with another project, which already runs its own Caddy container owning ports 80/443 — so this repo has no `caddy` service of its own; `fastapi_web` instead joins that project's Docker network (`app_webnet`, referenced as an external network) so its Caddy can reverse-proxy to `fastapi_web:8000` by name. The actual Caddy site config for this domain lives outside this repo, directly on the VM. `deploy/deploy.sh` pulls `main` and rebuilds/restarts this project's containers, run either by hand on the VM or automatically via `.github/workflows/deploy-oracle.yml`, which SSHes in and runs it on every push to `main` that touches `app/`, `mcp_servers/`, `Dockerfile`, `docker-compose.yml`, or `requirements.lock`. `deploy/setup-vm.sh` is a one-time provisioning script written for a dedicated fresh VM (Docker install + firewall rules + initial clone) — only its clone/`.env`-seeding steps were actually needed on this shared VM, since Docker was already installed there.
+Deployed via `docker-compose.yml` (`fastapi_web`, `celery_worker`, `redis_broker` — Redis 8, for both the Celery broker and the LangGraph checkpointer's RediSearch/RedisJSON module requirement) on an Oracle Cloud "Always Free" VM at `pr-review-agent.live`, with Caddy terminating HTTPS in front of `fastapi_web`. `deploy/deploy.sh` pulls `main` and rebuilds/restarts the containers, run either by hand on the VM or automatically via `.github/workflows/deploy-oracle.yml`, which SSHes in and runs it on every push to `main` that touches `app/`, `mcp_servers/`, `Dockerfile`, `docker-compose.yml`, or `requirements.lock`. `deploy/setup-vm.sh` is a one-time provisioning script for a fresh VM (Docker install, firewall rules, initial clone).
 
 ## Security notes
 
