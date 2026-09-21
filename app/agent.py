@@ -28,10 +28,9 @@ logger = logging.getLogger(__name__)
 
 MCP_SERVERS_DIR = Path(__file__).resolve().parent.parent / "mcp_servers"
 
-# If every MCP tool call in a turn comes back as an "Error: ..." string this
-# many turns in a row, the problem is environmental (bad repo_path, a tool
-# crash) rather than something the agent can fix by rewriting code, so stop
-# instead of letting it keep guessing at file contents.
+# Stop once every tool call in a turn errors for this many turns in a row --
+# signals an environment problem (bad repo_path, a tool crash) rather than
+# something fixable by the agent retrying.
 MAX_CONSECUTIVE_TOOL_ERROR_TURNS = 2
 
 
@@ -46,19 +45,14 @@ class ReviewAgentState(AgentState):
     # other nodes/hooks can inspect it programmatically without parsing text.
     target_files: NotRequired[list[str]]
 
-# Tools excluded from every persona's toolset entirely (not just discouraged
-# via the prompt): a prompt-only "don't use X" instruction is not reliable
-# enough on its own, since this agent's model has already been observed
-# ignoring textual instructions elsewhere in this file. list_repo_files
-# enables whole-repo scanning, which defeats the point of the target_files/
-# scan_local_dependencies minimal-context workflow below.
+# Excluded entirely rather than just discouraged via the prompt:
+# list_repo_files enables whole-repo scanning, which defeats the
+# target_files/scan_local_dependencies minimal-context workflow below.
 _FORBIDDEN_TOOL_NAMES = {"list_repo_files"}
 
-# Specialist personas on the review panel are read-only reviewers: they
-# analyze and describe fixes in their findings text rather than writing code
-# themselves (apply_code_patch is deliberately withheld), since arbitrating
-# conflicting patches from two independent agents is out of scope for this
-# panel design -- the Synthesizer reconciles their *advice*, not their edits.
+# Specialists are read-only reviewers: no apply_code_patch. Concrete fixes
+# are reported as suggested_fixes text instead; the Synthesizer reconciles
+# each specialist's advice, not their edits.
 _SPECIALIST_TOOL_NAMES = {"fetch_file_contents", "scan_local_dependencies", "run_validation_suite"}
 
 
@@ -209,11 +203,10 @@ PERFORMANCE_ARCHITECT_PROMPT = _persona_prompt(
     "reason -- do not write 'None found.' for that case.",
 )
 
-# Used only for each specialist's response_format extraction pass, not the
-# tool-using ReAct loop above -- same reasoning as STRUCTURED_OUTPUT_PROMPT
-# had in the single-agent design: langgraph does not persist the ReAct
-# loop's injected `prompt=` into state["messages"], so this pass needs its
-# own self-contained instructions.
+# Used for each specialist's structured-output extraction pass, not the
+# tool-using ReAct loop above: langgraph does not persist the ReAct loop's
+# injected `prompt=` into state["messages"], so this pass needs its own
+# self-contained instructions.
 SPECIALIST_STRUCTURED_PROMPT = """Using only the tool calls and tool results already in this
 conversation, produce your structured findings for this specialist review. Every field must be
 grounded in the actual file contents returned by fetch_file_contents calls above -- describe real
@@ -343,10 +336,9 @@ class PanelState(TypedDict):
     """Shared state for the review panel's supervisor graph.
 
     security_warden and performance_architect each write to their own,
-    disjoint keys (never a shared 'messages' channel) -- harmless now that
-    they run sequentially, but also what would let them run in the same
-    superstep without an update conflict if a future change reintroduces
-    concurrency (e.g. once the Groq rate limit stops being the constraint).
+    disjoint keys, never a shared 'messages' channel -- required for
+    LangGraph to allow two nodes to update state in the same superstep
+    without an InvalidUpdateError.
     """
 
     task_message: str
@@ -396,11 +388,9 @@ def _sum_usage_metadata(messages: list) -> tuple[int, int]:
     turn, each producing its own AIMessage with its own usage figures, so
     summing across all of them gives this invocation's total token spend.
 
-    Caveat: on a resumed checkpointed thread (a retried task for the same
-    head sha), messages returned here include prior turns already recorded
-    by an earlier attempt, so a retry's totals overlap with what was already
-    written to Redis -- the same known conversation-growth tradeoff already
-    documented for retries in this codebase, not a new one introduced here.
+    Note: on a resumed checkpointed thread, messages include prior turns
+    already recorded by an earlier attempt, so a retry's totals overlap with
+    what was already written to Redis.
     """
     prompt_tokens = 0
     completion_tokens = 0
@@ -468,14 +458,10 @@ def _build_inline_comments(
     """Convert InlineSuggestions into GitHub inline review-comment dicts.
 
     Drops any suggestion whose file was not actually fetched during this run
-    -- the same fabrication guard as _is_grounded, applied per-suggestion
-    since the model could otherwise invent a plausible file/line pair -- and
-    separately drops any suggestion whose (file, line) isn't part of the PR's
-    actual diff. GitHub's create_review rejects the *entire* review, not just
-    the offending comment, if any comment can't be resolved against the diff
-    -- e.g. a specialist suggesting a fix in a fetched dependency file that
-    wasn't itself changed by this PR, or on an existing line of a changed
-    file that the diff doesn't touch.
+    (same fabrication guard as _is_grounded), and separately drops any
+    suggestion whose (file, line) isn't part of the PR's actual diff --
+    GitHub's create_review rejects the entire review if any comment can't be
+    resolved against the diff.
     """
     comments = []
     for suggestion in suggestions:
@@ -504,9 +490,8 @@ def _build_inline_comments(
 
 def _is_grounded(formatted_review: str, fetched_files: set[str]) -> bool:
     """Heuristic grounding check: a genuine review should reference at least
-    one file the agent actually fetched. Catches the observed failure mode
-    where the model fabricates a plausible-sounding review instead of using
-    the real fetch_file_contents results in the conversation.
+    one file the agent actually fetched, guarding against a fabricated
+    review not grounded in real tool results.
     """
     if not fetched_files:
         return False
@@ -518,13 +503,10 @@ def _thread_id_for(repository: str, pr_number: int, sha: str) -> str:
     """Redis checkpoint thread_id for a single code snapshot's review.
 
     Scoped to the head sha (not just repo+PR), so a later 'synchronize' event
-    -- new commits on the same PR -- gets its own clean thread instead of
-    resuming the previous commit's tool-call history: the old conversation
-    reflects code that no longer exists, and carrying it forward would
-    pollute the new review's context. Concurrent PRs stay segmented via
-    repository+pr_number as before; a retried task for the *same* sha still
-    resumes its own thread. Each specialist further namespaces its own
-    sub-agent thread off of this base id (see _run_specialist).
+    (new commits on the same PR) gets its own clean thread instead of
+    resuming the previous commit's tool-call history. A retried task for the
+    same sha still resumes its own thread. Each specialist further
+    namespaces its own sub-agent thread off of this base id.
     """
     return f"pr:{repository}:{pr_number}:{sha}"
 
@@ -623,12 +605,10 @@ async def _synthesize(security: SpecialistFindings | None, performance: Speciali
         + "\n\n"
         + _findings_block("Performance & Logic Architect Report", performance)
     )
-    # include_raw=True trades the plain parsed-object return for a
-    # {"raw", "parsed", "parsing_error"} dict -- needed to reach the raw
-    # AIMessage's usage_metadata, which the parsed ReviewOutput alone
-    # doesn't carry. A parsing failure still surfaces as parsed=None here
-    # (handled by the existing "final_review is None" branch downstream)
-    # rather than raising, same as before this change.
+    # include_raw=True returns {"raw", "parsed", "parsing_error"} instead of
+    # just the parsed object -- needed to reach the raw AIMessage's
+    # usage_metadata, which ReviewOutput alone doesn't carry. A parsing
+    # failure surfaces as parsed=None, handled by the None-check downstream.
     response = await model.with_structured_output(ReviewOutput, include_raw=True).ainvoke(
         [("system", SYNTHESIZER_PROMPT), ("user", panel_report)]
     )
@@ -688,10 +668,8 @@ def _build_panel_graph(tools: list, checkpointer: AsyncRedisSaver, base_thread_i
         performance = state.get("performance_findings")
         review = await _synthesize(security, performance)
         if review is not None:
-            # Assembled directly from each specialist's own schema-constrained
-            # suggested_fixes rather than asked of the Synthesizer LLM -- see
-            # SYNTHESIZER_PROMPT's history for why relying on it to extract
-            # fixes back out of free-text findings was unreliable.
+            # Built from each specialist's own suggested_fixes directly,
+            # not extracted by the Synthesizer LLM from free text.
             review.inline_suggestions = (security.suggested_fixes if security else []) + (
                 performance.suggested_fixes if performance else []
             )
@@ -719,10 +697,9 @@ def _build_task_message(
     """Build the specialists' initial task message and the list of target-file
     basenames whose diff was embedded directly in it (diff_shown_files).
 
-    target_files not present in file_patches (GitHub couldn't diff them -- too
-    large or binary, per list_changed_files) are listed separately as files
-    the specialist must fetch in full via fetch_file_contents, same as every
-    target_file was handled before diff-aware fetching existed.
+    target_files not present in file_patches (GitHub couldn't diff them --
+    too large or binary) are listed separately as files to fetch in full via
+    fetch_file_contents.
     """
     diffed_files = [f for f in target_files if file_patches.get(f)]
     full_fetch_files = [f for f in target_files if not file_patches.get(f)]
@@ -777,9 +754,8 @@ async def run_pr_review_agent(pr_metadata: dict, repo_path: Path) -> dict:
 
         base_thread_id = _thread_id_for(repository, pr_number, sha)
 
-        # Redis-backed checkpointing: state for this PR's review panel
-        # survives a worker crash/restart (vs. the in-memory default, which
-        # loses everything). The same checkpointer connection backs the
+        # Redis-backed checkpointing: this PR's review panel state survives a
+        # worker crash/restart. The same checkpointer connection backs the
         # panel graph itself (thread_id=base_thread_id) and each specialist's
         # own sub-agent (thread_id=f"{base_thread_id}:{persona_key}").
         settings = get_settings()
@@ -851,11 +827,9 @@ async def run_pr_review_agent(pr_metadata: dict, repo_path: Path) -> dict:
             "summary": summary_text,
         }
     except (RateLimitError, APIConnectionError, APITimeoutError):
-        # Transient Groq failures (429 rate limit, dropped connection,
-        # request timeout) are worth retrying later rather than failing the
-        # review outright -- re-raise past this handler so Celery's
-        # autoretry_for on process_pr_review_task can back off and try again
-        # instead of the error being silently swallowed here.
+        # Re-raise past this handler so Celery's autoretry_for on
+        # process_pr_review_task can back off and retry, instead of this
+        # transient failure being swallowed into an "error" status below.
         logger.warning(
             "Transient Groq API failure reviewing %s#%s; re-raising for Celery retry", repository, pr_number
         )

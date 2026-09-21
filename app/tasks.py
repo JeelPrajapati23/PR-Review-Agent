@@ -21,17 +21,12 @@ logger = logging.getLogger(__name__)
 _TRANSIENT_GROQ_ERRORS = (RateLimitError, APIConnectionError, APITimeoutError)
 
 # Upper bound on a single review panel run. Celery's own task_time_limit/
-# task_soft_time_limit are *not* enforced by the solo pool (`-P solo`,
-# required on Windows per CLAUDE.md -- confirmed via solo.TaskPool's own
-# _get_info reporting an empty 'timeouts' tuple), so a genuine hang inside
-# run_pr_review_agent (a stuck MCP subprocess, a wedged Groq call) would
-# otherwise never raise, never hit on_failure, and leave the PR's commit
-# status stuck on 'pending' forever -- the exact failure mode
-# _CommitStatusOnFailureTask exists to prevent. Enforcing the bound here with
-# asyncio.wait_for works regardless of pool type. 10 minutes is generous
-# headroom over a normal review (observed ~8-12k tokens across three
-# sequential Groq calls, typically well under a minute) while still bounding
-# the worst case. A TimeoutError here isn't one of _TRANSIENT_GROQ_ERRORS, so
+# task_soft_time_limit are not enforced by the solo pool (`-P solo`,
+# required on Windows), so a genuine hang inside run_pr_review_agent (a
+# stuck MCP subprocess, a wedged Groq call) would otherwise never raise,
+# never hit on_failure, and leave the PR's commit status stuck on 'pending'
+# forever. Enforcing the bound here with asyncio.wait_for works regardless
+# of pool type. A TimeoutError here isn't one of _TRANSIENT_GROQ_ERRORS, so
 # it fails the task immediately rather than retrying a hang three more times.
 _AGENT_TIMEOUT_SECONDS = 10 * 60
 

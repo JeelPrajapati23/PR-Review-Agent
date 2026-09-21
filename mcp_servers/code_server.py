@@ -64,13 +64,8 @@ def fetch_file_contents(repo_path: str, file_path: str) -> str:
 
     Line numbers are prepended specifically so a reviewing agent can quote an
     exact line for a SUGGESTION marker instead of counting lines from raw
-    text by eye -- reproduced directly: without numbering, a real review
-    panel mis-numbered a SUGGESTION by one line and separately extrapolated a
-    second SUGGESTION 12 lines past a wrong anchor to a line past the end of
-    the file, which GitHub's review-comment API then rejected outright with
-    a "Line could not be resolved" 422 (the correct *relative* offset between
-    two near-duplicate functions, applied to an already-wrong absolute
-    starting line).
+    text by eye -- an off-by-one here gets rejected outright by GitHub's
+    review-comment API with a "Line could not be resolved" 422.
 
     Returns an explicit "Error: ..." string instead of raising if repo_path
     doesn't exist, file_path escapes the repo root, the file is missing, or

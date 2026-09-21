@@ -8,10 +8,10 @@ from langchain_core.messages import AIMessage
 from app.agent import _sum_usage_metadata
 from app.telemetry import _METRICS_TTL_SECONDS, calculate_cost, check_budget_ok, record_usage
 
-# Regression guard for a real bug caught via a live-Redis smoke test: a
-# module-level cached redis.asyncio client tied to one asyncio.run()'s event
-# loop broke on a second, later asyncio.run() call with "Event loop is
-# closed". record_usage now opens a fresh client per call instead, so these
+# Guards against a module-level cached redis.asyncio client tied to one
+# asyncio.run()'s event loop, which breaks on a second, later asyncio.run()
+# call with "Event loop is closed". record_usage opens a fresh client per
+# call instead, so these
 # fakes model that -- __aenter__/__aexit__ on the client, not just the
 # pipeline -- to make sure a regression back to caching would show up here.
 

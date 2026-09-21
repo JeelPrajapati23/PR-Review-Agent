@@ -40,7 +40,7 @@ def _has_real_groq_key() -> bool:
     # Goes through get_settings() -- the same lru_cache'd path
     # run_pr_review_agent itself uses -- rather than raw os.environ, because
     # Settings() also reads GROQ_API_KEY from .env (pydantic-settings'
-    # source order is env vars > .env > field defaults, confirmed via
+    # source order is env vars > .env > field defaults, per
     # BaseSettings.settings_customise_sources). A real key that only lives
     # in .env, with nothing exported in the shell, would show up here but
     # not in os.environ directly. This only resolves correctly if this file
@@ -70,7 +70,7 @@ def test_full_review_pipeline_against_real_groq_and_mcp_servers(tmp_path):
 
     # Minimal fixture with one unambiguous, real issue -- kept tiny to
     # minimize token spend against Groq's tight daily budget (see
-    # app/telemetry.py's check_budget_ok / CLAUDE.md's TPM/TPD notes).
+    # app/telemetry.py's check_budget_ok).
     (tmp_path / "app").mkdir()
     (tmp_path / "app" / "vulnerable.py").write_text(
         "import sqlite3\n"

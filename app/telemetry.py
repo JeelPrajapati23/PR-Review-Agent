@@ -38,11 +38,8 @@ def _new_redis_client() -> aioredis.Redis:
     # and a redis.asyncio client's connection is bound to whichever event
     # loop was running when it first connected -- reusing a cached client
     # across a later, different event loop fails with "Event loop is
-    # closed" (reproduced directly: the second of two sequential
-    # asyncio.run(record_usage(...)) calls against a real Redis silently
-    # dropped its update after this exact failure). A fresh client per call,
-    # closed via `async with` below, costs one extra connection setup but
-    # sidesteps the problem entirely.
+    # closed". A fresh client per call, closed via `async with` below, costs
+    # one extra connection setup but sidesteps the problem entirely.
     return aioredis.Redis.from_url(get_settings().redis_url, decode_responses=True)
 
 
@@ -84,6 +81,29 @@ async def record_usage(model: str, prompt_tokens: int, completion_tokens: int) -
                 await pipe.execute()
     except Exception:
         logger.exception("Failed to record Groq usage telemetry to Redis (model=%s)", model)
+
+
+def reset_daily_usage() -> None:
+    """Delete today's Groq usage counters, so check_budget_ok reads zero again.
+
+    Only meaningful when the Redis-tracked total has genuinely stopped
+    reflecting reality -- the one real caller is evaluation/run_reviews.py's
+    key rotation, which switches to a different Groq account (its own
+    separate quota) mid-run, making the previous key's accumulated total
+    irrelevant to what the new key can still spend. Never call this from the
+    production webhook/task path: it shares this same Redis-wide counter, so
+    resetting it there would silently blow the real daily budget for every
+    other review that day, not just the one that "needed" a reset.
+    """
+    today = datetime.now(timezone.utc).date().isoformat()
+    try:
+        _get_sync_redis_client().delete(
+            f"usage:groq:prompt_tokens:{today}",
+            f"usage:groq:completion_tokens:{today}",
+            f"usage:groq:cost:{today}",
+        )
+    except Exception:
+        logger.exception("Failed to reset today's Groq usage telemetry in Redis")
 
 
 def check_budget_ok(model: str, safe_limit: int = 90_000) -> bool:

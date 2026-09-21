@@ -102,19 +102,17 @@ def ensure_repo_checkout(clone_url: str, full_name: str, branch: str) -> Path:
     logger.info("Fetching %s and checking out branch %s", full_name, branch)
     # branch is a PR's head.ref, fully attacker-controlled (any fork owner
     # names their own branch). Passed as a bare positional argument here, so
-    # without "--" a value like "--upload-pack=<cmd>" is parsed by git as an
-    # option rather than a literal ref name -- reproduced directly: git
-    # actually invoked the injected string as a subprocess. "--" forces
-    # everything after it to be read as a literal ref/pathspec, closing that
-    # off. (The --branch value in the clone call above and the -B value in
-    # the checkout call below don't need this: both are consumed as an
-    # option's value by the immediately preceding flag, never re-parsed.)
+    # without "--" a value like "--upload-pack=<cmd>" would be parsed by git
+    # as an option rather than a literal ref name. "--" forces everything
+    # after it to be read as a literal ref/pathspec, closing that off. (The
+    # --branch value in the clone call above and the -B value in the
+    # checkout call below don't need this: both are consumed as an option's
+    # value by the immediately preceding flag, never re-parsed.)
     _run_git(["fetch", "--depth=1", "origin", "--", branch], cwd=target, config=auth_config)
     # --force: a previous review's leftover uncommitted changes to a tracked
-    # file (e.g. a patch attempt) would otherwise make plain `checkout -B`
-    # abort with "local changes would be overwritten" before reset --hard
-    # below ever gets a chance to clean the tree -- confirmed by direct
-    # reproduction, not theoretical.
+    # file would otherwise make plain `checkout -B` abort with "local
+    # changes would be overwritten" before reset --hard below ever gets a
+    # chance to clean the tree.
     _run_git(["checkout", "--force", "-B", branch, "FETCH_HEAD"], cwd=target)
     _run_git(["reset", "--hard", "FETCH_HEAD"], cwd=target)
     # Removes untracked leftovers from a previous review (e.g. a new file a

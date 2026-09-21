@@ -26,9 +26,7 @@ TEST_INNER_TIMEOUT_SECONDS = 15
 # design. The env below is the entire environment that code gets to see:
 # PATH so the interpreter/pytest can be found at all, plus the handful of
 # vars Windows' own interpreter startup and tempfile/cache handling need to
-# function (confirmed empirically: a real pytest run against a real test
-# file, from a process holding only these vars, collects/executes/passes
-# normally). Every secret this worker process holds -- GROQ_API_KEY,
+# function. Every secret this worker process holds -- GROQ_API_KEY,
 # GITHUB_APP_PRIVATE_KEY_B64, REDIS_URL, GITHUB_WEBHOOK_SECRET, CELERY_BROKER_URL --
 # is deliberately absent, so malicious test code can't read them via
 # os.environ and echo them into this tool's stdout/stderr, which would
@@ -49,11 +47,10 @@ def _sandbox_subprocess_kwargs() -> dict:
     to already hold the privilege to change uid -- in practice, running as
     root. Two cases both fail open to "no extra kwargs" rather than raising,
     since a review shouldn't hard-fail just because privilege-dropping isn't
-    available in this deployment: Windows has no equivalent at all (this
-    project's primary target, per CLAUDE.md), and a worker that's already
-    running unprivileged can't drop further -- which is itself the more
-    common, arguably safer posture for a containerized deployment, not a
-    condition to treat as an error.
+    available in this deployment: Windows has no equivalent at all, and a
+    worker that's already running unprivileged can't drop further -- which
+    is itself the more common, arguably safer posture for a containerized
+    deployment, not a condition to treat as an error.
 
     Note this is defense-in-depth on top of the env stripping above, not a
     full jail: dropping uid alone doesn't isolate the filesystem or network,
@@ -103,14 +100,27 @@ def _supports_timeout_flag(pytest_binary: str) -> bool:
 
 
 def _pytest_command(root: Path) -> list[str]:
-    """Prefer the repo's own venv pytest over whatever is on PATH."""
+    """Prefer the repo's own venv pytest over whatever is on PATH.
+
+    Resolution order: (1) root's own nested .venv, for a PR repo that ships
+    its own pinned venv; (2) this server's own interpreter's sibling pytest
+    -- sys.executable's directory holds pytest's console-script entry point
+    right alongside it in a real venv and in a container's system Python
+    alike, so this works regardless of whether whatever launched this server
+    had PATH set up for it; (3) bare "pytest" resolved via PATH as a
+    last-resort fallback.
+    """
     scripts_dir = root / ".venv" / "Scripts"
-    pytest_binary = "pytest"
+    pytest_binary = None
     for name in ("pytest.exe", "pytest"):
         candidate = scripts_dir / name
         if candidate.is_file():
             pytest_binary = str(candidate)
             break
+
+    if pytest_binary is None:
+        interpreter_sibling = Path(sys.executable).parent / ("pytest.exe" if os.name == "nt" else "pytest")
+        pytest_binary = str(interpreter_sibling) if interpreter_sibling.is_file() else "pytest"
 
     command = [pytest_binary]
     if _supports_timeout_flag(pytest_binary):
@@ -132,11 +142,9 @@ def _run_pytest(command: list[str], root: Path) -> str:
             # transport to receive JSON-RPC requests from the parent process.
             # Without an explicit stdin here, pytest inherits that same pipe
             # and blocks on it for the full TEST_TIMEOUT_SECONDS on Windows,
-            # regardless of what the target repo's tests actually contain
-            # (confirmed by reproducing: identical command/repo completes
-            # instantly as a bare script, but hangs every time when spawned
-            # from within this MCP server's own event loop). Redirecting to
-            # DEVNULL gives pytest an isolated, already-closed stdin instead.
+            # regardless of what the target repo's tests actually contain.
+            # Redirecting to DEVNULL gives pytest an isolated, already-closed
+            # stdin instead.
             stdin=subprocess.DEVNULL,
             # Sandboxing: a stripped env (no secrets visible to PR-supplied
             # test code) plus, where possible, a privilege drop -- see the

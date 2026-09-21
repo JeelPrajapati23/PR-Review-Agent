@@ -26,6 +26,15 @@ Usage:
     python evaluation/judge_results.py              # resume: grades whatever's left
     python evaluation/judge_results.py --force       # re-grades everything
     python evaluation/judge_results.py --only sec-01-sql-injection
+
+Optional key rotation: set GEMINI_API_KEY to a comma-separated list of keys
+(in .env or the environment) instead of a single one. On a 429 (rate limit)
+or a 401/403 (this specific key is invalid/unauthorized), the run rotates to
+the next key and retries the same fixture rather than stopping -- only once
+every key has been tried does it fall back to the original stop-the-run
+behavior. A 400 (malformed request) is never a key problem, so it still
+stops the run immediately regardless of how many keys are configured. A
+single key still works exactly as before.
 """
 import argparse
 import json
@@ -57,10 +66,9 @@ _F_BETA = 2.0
 _GEMINI_MIN_REQUEST_INTERVAL_SECONDS = 6.0
 
 # 5xx ("model currently experiencing high demand") errors are transient
-# server-side capacity issues, not a reason to give up on a fixture --
-# observed hitting the majority of calls in a single run. A few retries with
-# linear backoff clears most of them without needing a whole extra pass of
-# this script.
+# server-side capacity issues, not a reason to give up on a fixture. A few
+# retries with linear backoff clears most of them without needing a whole
+# extra pass of this script.
 _GEMINI_SERVER_ERROR_MAX_RETRIES = 3
 _GEMINI_SERVER_ERROR_BACKOFF_SECONDS = 8.0
 
@@ -123,14 +131,69 @@ def _build_user_prompt(entry: dict, meta: dict, review_text: str) -> str:
     )
 
 
-def _resolve_gemini_config() -> tuple[str | None, str]:
-    """Resolve (api_key, model) from the environment, falling back to a
+class _KeyRotator:
+    """Cycles forward through a fixed list of API keys within one process run.
+
+    Not persisted across separate invocations -- each fresh run starts back
+    at the first key. That's deliberate: whether key N was exhausted in a
+    prior run says nothing about whether it's exhausted now (rate limits
+    refill on their own schedule), so remembering "last used index" across
+    runs would as often skip a key that's fine again as it would save time.
+    """
+
+    def __init__(self, keys: list[str]):
+        if not keys:
+            raise ValueError("_KeyRotator needs at least one key")
+        self._keys = keys
+        self._index = 0
+
+    @property
+    def current(self) -> str:
+        return self._keys[self._index]
+
+    @property
+    def current_number(self) -> int:
+        """1-indexed, for human-readable log lines."""
+        return self._index + 1
+
+    @property
+    def total(self) -> int:
+        return len(self._keys)
+
+    def advance(self) -> bool:
+        """Move to the next key. Returns False (state unchanged) if this was
+        already the last one -- the caller decides what "nothing left to
+        rotate to" means for its own run.
+        """
+        if self._index + 1 >= len(self._keys):
+            return False
+        self._index += 1
+        return True
+
+
+def _parse_key_list(raw: str | None) -> list[str]:
+    """Split a comma-separated key list, stripping whitespace and dropping
+    empties (a trailing comma shouldn't produce a bogus empty-string "key").
+    A single key with no comma still round-trips as a one-element list.
+    """
+    if not raw:
+        return []
+    return [key.strip() for key in raw.split(",") if key.strip()]
+
+
+def _resolve_gemini_config() -> tuple[list[str], str]:
+    """Resolve (api_keys, model) from the environment, falling back to a
     direct .env read -- same source-order convention pydantic-settings uses
     (real env vars win, .env is the fallback) without pulling in
     app.config.Settings, which would otherwise force this Gemini-only
     script to also provide unrelated GROQ_/GITHUB_ secrets it never uses.
+
+    GEMINI_API_KEY may hold a single key or a comma-separated list -- unlike
+    Groq's GROQ_API_KEY, nothing else requires this var to hold exactly one
+    value, so the same var doubles as the rotation list with no separate
+    "plural" var needed.
     """
-    api_key = os.environ.get("GEMINI_API_KEY")
+    raw_api_key = os.environ.get("GEMINI_API_KEY")
     model = os.environ.get("GEMINI_MODEL") or _DEFAULT_GEMINI_MODEL
 
     env_path = DATASET_ROOT.parent / ".env"
@@ -144,12 +207,12 @@ def _resolve_gemini_config() -> tuple[str | None, str]:
             value = value.strip().strip('"').strip("'")
             if not value or value == "changeme":
                 continue
-            if key == "GEMINI_API_KEY" and not api_key:
-                api_key = value
+            if key == "GEMINI_API_KEY" and not raw_api_key:
+                raw_api_key = value
             elif key == "GEMINI_MODEL" and not os.environ.get("GEMINI_MODEL"):
                 model = value
 
-    return api_key, model
+    return _parse_key_list(raw_api_key), model
 
 
 def _parse_args() -> argparse.Namespace:
@@ -302,8 +365,8 @@ def main() -> None:
     judge_summary_json_path = results_dir / "_judge_summary.json"
     judge_summary_md_path = results_dir / "_judge_summary.md"
 
-    api_key, model = _resolve_gemini_config()
-    if not api_key:
+    api_keys, model = _resolve_gemini_config()
+    if not api_keys:
         raise SystemExit(
             "GEMINI_API_KEY is not set (checked the environment and .env). This script grades "
             "already-generated reviews with Gemini and needs its own key -- add GEMINI_API_KEY to "
@@ -317,7 +380,10 @@ def main() -> None:
         if not entries:
             raise SystemExit(f"No manifest entry with id '{args.only}'")
 
-    client = genai.Client(api_key=api_key)
+    rotator = _KeyRotator(api_keys)
+    if rotator.total > 1:
+        print(f"Gemini key rotation active: {rotator.total} keys available (starting on key 1)")
+    client = genai.Client(api_key=rotator.current)
     total = len(entries)
     graded_this_run = 0
     last_request_at: float | None = None
@@ -351,83 +417,98 @@ def main() -> None:
                 print(f"[{index}/{total}] {fixture_id}: already graded, skipping (use --force to redo)")
                 continue
 
-        if last_request_at is not None:
-            wait_for = _GEMINI_MIN_REQUEST_INTERVAL_SECONDS - (time.monotonic() - last_request_at)
-            if wait_for > 0:
-                print(f"[{index}/{total}] {fixture_id}: throttling {wait_for:.1f}s to respect Gemini's per-minute limit")
-                time.sleep(wait_for)
+        stop_run = False
+        while True:
+            if last_request_at is not None:
+                wait_for = _GEMINI_MIN_REQUEST_INTERVAL_SECONDS - (time.monotonic() - last_request_at)
+                if wait_for > 0:
+                    print(f"[{index}/{total}] {fixture_id}: throttling {wait_for:.1f}s to respect Gemini's per-minute limit")
+                    time.sleep(wait_for)
 
-        print(f"[{index}/{total}] {fixture_id}: grading with {model}...")
-        started_iso = datetime.now(timezone.utc).isoformat()
-        started_at = time.monotonic()
-        last_request_at = started_at
-        try:
-            verdict = _grade_fixture_with_retries(
-                client, model, entry, meta, agent_result["summary"], fixture_id, f"[{index}/{total}]"
-            )
-        except genai_errors.APIError as exc:
-            if exc.code == 429:
-                print(f"[{index}/{total}] {fixture_id}: Gemini rate limit hit -- stopping run, nothing lost")
-                break
-            if exc.code in (400, 401, 403):
-                # An auth/permission failure (bad or revoked GEMINI_API_KEY,
-                # no access to this model, etc.) is not fixture-specific --
-                # every remaining fixture would fail identically, so grinding
-                # through the rest just burns the throttle delay for nothing.
-                # Don't even write a result for this fixture: an error record
-                # here would (before the resume-skip fix above) or could
-                # again in the future look like "already attempted."
-                print(
-                    f"[{index}/{total}] {fixture_id}: Gemini auth/permission error "
-                    f"({exc.code}: {exc.message}) -- stopping run, fix GEMINI_API_KEY and retry"
+            key_suffix = f" (key {rotator.current_number}/{rotator.total})" if rotator.total > 1 else ""
+            print(f"[{index}/{total}] {fixture_id}: grading with {model}{key_suffix}...")
+            started_iso = datetime.now(timezone.utc).isoformat()
+            started_at = time.monotonic()
+            last_request_at = started_at
+            try:
+                verdict = _grade_fixture_with_retries(
+                    client, model, entry, meta, agent_result["summary"], fixture_id, f"[{index}/{total}]"
+                )
+            except genai_errors.APIError as exc:
+                if exc.code == 429 or exc.code in (401, 403):
+                    # Rate limit or this-key-specific auth/permission failure
+                    # (bad or revoked key, no access to this model) -- try the
+                    # next rotation key on the same fixture before giving up.
+                    if rotator.advance():
+                        print(
+                            f"[{index}/{total}] {fixture_id}: Gemini {exc.code} on key {rotator.current_number - 1}/"
+                            f"{rotator.total} -- rotating to key {rotator.current_number}/{rotator.total} and retrying"
+                        )
+                        client = genai.Client(api_key=rotator.current)
+                        continue
+                    print(
+                        f"[{index}/{total}] {fixture_id}: Gemini {exc.code} -- all {rotator.total} key(s) "
+                        f"exhausted, stopping run, nothing lost"
+                    )
+                    stop_run = True
+                    break
+                if exc.code == 400:
+                    # A malformed request isn't fixed by a different key --
+                    # every remaining fixture would fail identically, so
+                    # grinding through the rest just burns time for nothing.
+                    print(f"[{index}/{total}] {fixture_id}: Gemini bad request ({exc.message}) -- stopping run")
+                    stop_run = True
+                    break
+                print(f"[{index}/{total}] {fixture_id}: Gemini API error ({exc.code}: {exc.message}) -- storing error, continuing")
+                _write_json_atomically(
+                    judge_path,
+                    {
+                        "id": fixture_id,
+                        "category": entry["category"],
+                        "judged_at_utc": started_iso,
+                        "wall_clock_seconds": round(time.monotonic() - started_at, 1),
+                        "judge_model": model,
+                        "error": f"APIError {exc.code}: {exc.message}",
+                        "verdict": None,
+                    },
                 )
                 break
-            print(f"[{index}/{total}] {fixture_id}: Gemini API error ({exc.code}: {exc.message}) -- storing error, continuing")
-            _write_json_atomically(
-                judge_path,
-                {
-                    "id": fixture_id,
-                    "category": entry["category"],
-                    "judged_at_utc": started_iso,
-                    "wall_clock_seconds": round(time.monotonic() - started_at, 1),
-                    "judge_model": model,
-                    "error": f"APIError {exc.code}: {exc.message}",
-                    "verdict": None,
-                },
-            )
-            continue
-        except Exception as exc:
-            print(f"[{index}/{total}] {fixture_id}: grading failed ({type(exc).__name__}: {exc}) -- storing error, continuing")
-            _write_json_atomically(
-                judge_path,
-                {
-                    "id": fixture_id,
-                    "category": entry["category"],
-                    "judged_at_utc": started_iso,
-                    "wall_clock_seconds": round(time.monotonic() - started_at, 1),
-                    "judge_model": model,
-                    "error": f"{type(exc).__name__}: {exc}",
-                    "verdict": None,
-                },
-            )
-            continue
+            except Exception as exc:
+                print(f"[{index}/{total}] {fixture_id}: grading failed ({type(exc).__name__}: {exc}) -- storing error, continuing")
+                _write_json_atomically(
+                    judge_path,
+                    {
+                        "id": fixture_id,
+                        "category": entry["category"],
+                        "judged_at_utc": started_iso,
+                        "wall_clock_seconds": round(time.monotonic() - started_at, 1),
+                        "judge_model": model,
+                        "error": f"{type(exc).__name__}: {exc}",
+                        "verdict": None,
+                    },
+                )
+                break
 
-        record = {
-            "id": fixture_id,
-            "category": entry["category"],
-            "judged_at_utc": started_iso,
-            "wall_clock_seconds": round(time.monotonic() - started_at, 1),
-            "judge_model": model,
-            "error": None,
-            "verdict": verdict.model_dump(),
-        }
-        _write_json_atomically(judge_path, record)
-        graded_this_run += 1
-        print(
-            f"[{index}/{total}] {fixture_id}: caught={verdict.true_positive_caught} "
-            f"section_correct={verdict.section_correct} severity_matched={verdict.severity_matched} "
-            f"false_positives={verdict.false_positive_count} -- stored"
-        )
+            record = {
+                "id": fixture_id,
+                "category": entry["category"],
+                "judged_at_utc": started_iso,
+                "wall_clock_seconds": round(time.monotonic() - started_at, 1),
+                "judge_model": model,
+                "error": None,
+                "verdict": verdict.model_dump(),
+            }
+            _write_json_atomically(judge_path, record)
+            graded_this_run += 1
+            print(
+                f"[{index}/{total}] {fixture_id}: caught={verdict.true_positive_caught} "
+                f"section_correct={verdict.section_correct} severity_matched={verdict.severity_matched} "
+                f"false_positives={verdict.false_positive_count} -- stored"
+            )
+            break
+
+        if stop_run:
+            break
 
     rows = []
     for entry in entries:
