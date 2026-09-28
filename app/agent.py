@@ -1,4 +1,5 @@
 import logging
+import re
 import sys
 from pathlib import Path
 from typing import NotRequired, TypedDict
@@ -127,7 +128,9 @@ fetch_file_contents on the paths it returns. Never guess at file contents or a f
 
 You are a read-only reviewer on this panel -- you have no patch tool. When you find a concrete,
 line-level fix, report it as a structured suggested fix (file, line, replacement code, one-sentence
-reason) in addition to describing it in your findings text. Every line shown to you -- whether in a
+reason) in addition to describing it in your findings text. The replacement code replaces exactly
+the targeted line(s) -- if it rewrites several consecutive lines, also give end_line (the last line
+it replaces), or the untouched originals will remain below it as duplicates. Every line shown to you -- whether in a
 DIFFS section or returned by fetch_file_contents -- is prefixed with its exact 1-indexed new-file
 line number (format: "N | code"; a removed line in a diff has no number, since it doesn't exist in
 the new file and can't be a fix target) specifically so you can copy that number directly rather
@@ -226,8 +229,18 @@ class InlineSuggestion(BaseModel):
 
     file_path: str = Field(description="Repo-relative path of the file this suggestion applies to.")
     line: int = Field(description="1-indexed line number in the file's current content where the fix applies.")
+    end_line: int | None = Field(
+        default=None,
+        description="Last line (inclusive) this fix replaces, when it rewrites several consecutive lines "
+        "starting at `line`. Omit for a single-line fix. suggested_code replaces lines line..end_line "
+        "entirely, so if your replacement is a rewrite of the next few lines too, you MUST cover them "
+        "here -- otherwise those original lines stay in place below your replacement and get duplicated.",
+    )
     suggested_code: str = Field(
-        description="Exact replacement text for that line/block, with no diff markers or line numbers."
+        description="Exact replacement text for that line/block, with no diff markers or line numbers. "
+        "Must keep the original line's full leading indentation (e.g. the 4 spaces before a statement "
+        "inside a function body) -- GitHub replaces the whole line verbatim, so stripped indentation "
+        "produces broken code."
     )
     comment: str = Field(description="One-sentence explanation of the issue being fixed.")
 
@@ -446,22 +459,90 @@ def _format_review(review: ReviewOutput) -> str:
     )
 
 
+def _leading_whitespace(text: str) -> str:
+    return text[: len(text) - len(text.lstrip())]
+
+
+def _restore_indentation(suggested_code: str, original_line: str) -> str:
+    """Re-indent a suggestion whose first line lost the original line's
+    leading whitespace. The model routinely strips it (seen live: a fix for an
+    indented `query = ...` line inside a function came back at column 0, which
+    GitHub's "Commit suggestion" would have applied as an IndentationError).
+
+    Two observed shapes: only the first line stripped (later lines still at or
+    past the original indent -- fix just the first line), or the whole block
+    dedented uniformly (pad every non-blank line by the missing amount). A
+    first line that opens a block (ends in ":" or "{") whose body sits at
+    exactly the original indent can only be the uniform-dedent case, since
+    that body must be nested deeper than its opener.
+    """
+    lines = suggested_code.split("\n")
+    first = next((i for i, line in enumerate(lines) if line.strip()), None)
+    if first is None:
+        return suggested_code
+
+    original_indent = _leading_whitespace(original_line)
+    first_indent = _leading_whitespace(lines[first])
+    if len(first_indent) >= len(original_indent):
+        return suggested_code
+
+    rest = [line for line in lines[first + 1 :] if line.strip()]
+    rest_indent = min((len(_leading_whitespace(line)) for line in rest), default=0)
+    opens_block = lines[first].rstrip().endswith((":", "{"))
+    if rest and rest_indent >= len(original_indent) and not (opens_block and rest_indent == len(original_indent)):
+        lines[first] = original_indent + lines[first].lstrip()
+        return "\n".join(lines)
+
+    pad = original_indent[len(first_indent) :]
+    return "\n".join(pad + line if line.strip() else line for line in lines)
+
+
 def _format_suggestion_body(suggestion: InlineSuggestion) -> str:
     return f"{suggestion.comment}\n\n```suggestion\n{suggestion.suggested_code}\n```"
+
+
+def _first_token(line: str) -> str | None:
+    match = re.match(r"\s*(\w+|\S)", line)
+    return match.group(1) if match else None
+
+
+def _replaced_line_range(suggestion: InlineSuggestion, file_lines: dict[int, str]) -> tuple[int, int]:
+    """(start, end) of the original lines a suggestion's replacement covers.
+
+    A GitHub suggestion replaces exactly the commented lines, so a multi-line
+    replacement anchored to a single line keeps the originals below it --
+    seen live: a fix rewriting both `query = ...` and the `return ...` after
+    it was anchored to the query line alone, so committing it would have left
+    two returns. When the model under-reports end_line, each extra
+    replacement line that starts with the same token as the next original
+    line (e.g. both `return`) is treated as a rewrite of it and pulled into
+    the range; anything else stays a genuine insertion.
+    """
+    start = suggestion.line
+    end = max(suggestion.end_line or start, start)
+    replacement = suggestion.suggested_code.split("\n")
+    for extra in replacement[end - start + 1 :]:
+        following = file_lines.get(end + 1)
+        if following is None or _first_token(extra) is None or _first_token(extra) != _first_token(following):
+            break
+        end += 1
+    return start, end
 
 
 def _build_inline_comments(
     suggestions: list[InlineSuggestion],
     fetched_files: set[str],
-    commentable_lines: dict[str, set[int]],
+    commentable_lines: dict[str, dict[int, str]],
 ) -> list[dict]:
     """Convert InlineSuggestions into GitHub inline review-comment dicts.
 
     Drops any suggestion whose file was not actually fetched during this run
     (same fabrication guard as _is_grounded), and separately drops any
-    suggestion whose (file, line) isn't part of the PR's actual diff --
+    suggestion whose replaced lines aren't all part of the PR's actual diff --
     GitHub's create_review rejects the entire review if any comment can't be
-    resolved against the diff.
+    resolved against the diff. Surviving suggestions get the target line's
+    original indentation restored (see _restore_indentation), and span every
+    line they replace (see _replaced_line_range).
     """
     comments = []
     for suggestion in suggestions:
@@ -474,17 +555,24 @@ def _build_inline_comments(
             resolved_path = next(
                 (path for path in commentable_lines if Path(path).name.lower() == basename), None
             )
-        if resolved_path is None or suggestion.line not in commentable_lines[resolved_path]:
+        if resolved_path is None:
+            continue
+        file_lines = commentable_lines[resolved_path]
+        if suggestion.line not in file_lines:
             continue
 
-        comments.append(
-            {
-                "path": resolved_path,
-                "line": suggestion.line,
-                "side": "RIGHT",
-                "body": _format_suggestion_body(suggestion),
-            }
+        suggestion = suggestion.model_copy(
+            update={"suggested_code": _restore_indentation(suggestion.suggested_code, file_lines[suggestion.line])}
         )
+        start, end = _replaced_line_range(suggestion, file_lines)
+        # A range crossing a gap between hunks isn't commentable as one block.
+        if any(n not in file_lines for n in range(start, end + 1)):
+            continue
+
+        comment = {"path": resolved_path, "line": end, "side": "RIGHT", "body": _format_suggestion_body(suggestion)}
+        if end > start:
+            comment.update(start_line=start, start_side="RIGHT")
+        comments.append(comment)
     return comments
 
 

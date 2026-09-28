@@ -1,4 +1,8 @@
-from app.github_client import _commentable_lines_from_patch, format_diff_for_review
+from app.github_client import (
+    _commentable_line_texts_from_patch,
+    _commentable_lines_from_patch,
+    format_diff_for_review,
+)
 
 # A synthetic two-hunk unified diff patch, in the same shape GitHub's PR
 # Files API returns via File.patch -- used to pin down format_diff_for_review
@@ -65,3 +69,15 @@ def test_commentable_lines_from_patch_excludes_removed_lines():
     commentable = _commentable_lines_from_patch(_SAMPLE_PATCH)
 
     assert commentable == {10, 11, 12, 13, 14, 15, 31, 32, 33}
+
+
+def test_commentable_line_texts_keep_leading_indentation():
+    # app/agent.py restores a suggestion's stripped indentation from this
+    # text, so the diff's own "+"/" " marker must be removed without also
+    # eating the line's real leading whitespace.
+    patch = "@@ -0,0 +1,2 @@\n+def get_user(conn, username):\n+    query = 'SELECT 1'\n"
+
+    assert _commentable_line_texts_from_patch(patch) == {
+        1: "def get_user(conn, username):",
+        2: "    query = 'SELECT 1'",
+    }

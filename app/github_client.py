@@ -173,7 +173,15 @@ def _commentable_lines_from_patch(patch: str) -> set[int]:
     somewhere in the file. Removed lines don't exist in the new file and are
     skipped without advancing the new-line counter.
     """
-    return {new_line for marker, new_line, _ in _walk_patch_new_lines(patch) if marker != "-"}
+    return set(_commentable_line_texts_from_patch(patch))
+
+
+def _commentable_line_texts_from_patch(patch: str) -> dict[int, str]:
+    """Same lines as _commentable_lines_from_patch, mapped to their actual
+    new-file text -- lets a suggestion's indentation be checked against the
+    real line it replaces.
+    """
+    return {new_line: text for marker, new_line, text in _walk_patch_new_lines(patch) if marker != "-"}
 
 
 def format_diff_for_review(patch: str) -> str:
@@ -211,15 +219,15 @@ def format_diff_for_review(patch: str) -> str:
     return "\n".join(lines_out)
 
 
-def get_diff_commentable_lines(full_name: str, pr_number: int) -> dict[str, set[int]]:
-    """Map each changed file's repo-relative path to the set of line numbers
-    a review comment can actually be anchored to for this PR -- GitHub's
-    create_review rejects the *entire* review (not just the offending
+def get_diff_commentable_lines(full_name: str, pr_number: int) -> dict[str, dict[int, str]]:
+    """Map each changed file's repo-relative path to {line number: line text}
+    for every line a review comment can actually be anchored to for this PR --
+    GitHub's create_review rejects the *entire* review (not just the offending
     comment) if any comment's (path, line) isn't part of the diff, so callers
     building inline suggestions must filter against this before posting.
     """
     try:
         pr = get_repo(full_name).get_pull(pr_number)
-        return {f.filename: _commentable_lines_from_patch(f.patch) for f in pr.get_files() if f.patch}
+        return {f.filename: _commentable_line_texts_from_patch(f.patch) for f in pr.get_files() if f.patch}
     except Exception as exc:
         raise GitHubNotifyError(f"failed to fetch diff for {full_name}#{pr_number}: {exc}") from exc

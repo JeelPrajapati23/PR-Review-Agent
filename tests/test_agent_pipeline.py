@@ -9,6 +9,7 @@ from app.agent import (
     ReviewOutput,
     SpecialistFindings,
     _build_inline_comments,
+    _restore_indentation,
     _build_panel_graph,
     _combine_fetched_files,
     _fetched_file_names,
@@ -157,7 +158,7 @@ def test_build_inline_comments_renders_exact_suggestion_markdown():
     )
 
     comments = _build_inline_comments(
-        [suggestion], fetched_files={"main.py"}, commentable_lines={"app/main.py": {42}}
+        [suggestion], fetched_files={"main.py"}, commentable_lines={"app/main.py": {42: "return x"}}
     )
 
     assert comments == [
@@ -177,7 +178,7 @@ def test_build_inline_comments_drops_suggestions_for_unfetched_files():
 
     assert (
         _build_inline_comments(
-            [suggestion], fetched_files={"main.py"}, commentable_lines={"app/fabricated.py": {1}}
+            [suggestion], fetched_files={"main.py"}, commentable_lines={"app/fabricated.py": {1: "pass"}}
         )
         == []
     )
@@ -193,7 +194,131 @@ def test_build_inline_comments_drops_suggestions_outside_the_diff():
 
     assert (
         _build_inline_comments(
-            [suggestion], fetched_files={"main.py"}, commentable_lines={"app/main.py": {42}}
+            [suggestion], fetched_files={"main.py"}, commentable_lines={"app/main.py": {42: "return x"}}
+        )
+        == []
+    )
+
+
+# Shapes observed live on a real PR: the model returned a fix for an indented
+# line inside a function body with its leading whitespace stripped, which
+# GitHub's "Commit suggestion" would have applied as an IndentationError.
+_ORIGINAL_QUERY_LINE = '    query = "SELECT * FROM users WHERE username = \'" + username + "\'"'
+
+
+def test_restore_indentation_fixes_single_stripped_line():
+    assert (
+        _restore_indentation('query = "SELECT * FROM users WHERE username = ?"', _ORIGINAL_QUERY_LINE)
+        == '    query = "SELECT * FROM users WHERE username = ?"'
+    )
+
+
+def test_restore_indentation_fixes_only_first_line_when_rest_already_indented():
+    suggested = 'query = "SELECT * FROM users WHERE username = ?"\n    return conn.execute(query, (username,)).fetchone()'
+
+    assert _restore_indentation(suggested, _ORIGINAL_QUERY_LINE) == (
+        '    query = "SELECT * FROM users WHERE username = ?"\n'
+        "    return conn.execute(query, (username,)).fetchone()"
+    )
+
+
+def test_restore_indentation_pads_uniformly_dedented_block():
+    suggested = "if user is None:\n    return None"
+
+    assert _restore_indentation(suggested, "    if not user:") == "    if user is None:\n        return None"
+
+
+def test_restore_indentation_leaves_correct_suggestions_untouched():
+    suggested = '    query = "SELECT 1"\n    return query'
+
+    assert _restore_indentation(suggested, _ORIGINAL_QUERY_LINE) == suggested
+    assert _restore_indentation("print('x')", "print('working..?')") == "print('x')"
+
+
+def test_build_inline_comments_restores_stripped_indentation():
+    suggestion = InlineSuggestion(
+        file_path="demo.py",
+        line=2,
+        suggested_code='query = "SELECT * FROM users WHERE username = ?"',
+        comment="Use a parameterized query.",
+    )
+
+    comments = _build_inline_comments(
+        [suggestion], fetched_files={"demo.py"}, commentable_lines={"demo.py": {2: _ORIGINAL_QUERY_LINE}}
+    )
+
+    assert '```suggestion\n    query = "SELECT * FROM users WHERE username = ?"\n```' in comments[0]["body"]
+
+
+_GET_USER_LINES = {
+    1: "def get_user(conn, username):",
+    2: _ORIGINAL_QUERY_LINE,
+    3: "    return conn.execute(query).fetchone()",
+    4: "",
+    5: "",
+    6: 'print("working..?")',
+}
+
+
+def test_build_inline_comments_extends_range_over_rewritten_following_lines():
+    # Real shape from a live PR: a two-line rewrite anchored only to line 2.
+    # Posted as-is, committing it would leave the original line-3 return below
+    # the new one; it must span lines 2-3 instead.
+    suggestion = InlineSuggestion(
+        file_path="demo.py",
+        line=2,
+        suggested_code='query = "SELECT * FROM users WHERE username = ?"\n    return conn.execute(query, (username,)).fetchone()',
+        comment="Use a parameterized query.",
+    )
+
+    [comment] = _build_inline_comments(
+        [suggestion], fetched_files={"demo.py"}, commentable_lines={"demo.py": _GET_USER_LINES}
+    )
+
+    assert (comment["start_line"], comment["start_side"], comment["line"]) == (2, "RIGHT", 3)
+
+
+def test_build_inline_comments_keeps_genuine_insertion_single_line():
+    # The extra line doesn't rewrite line 3 (different leading token), so this
+    # is an insertion: anchored to line 2 alone, with line 3 kept.
+    suggestion = InlineSuggestion(
+        file_path="demo.py",
+        line=2,
+        suggested_code='    if not username:\n        raise ValueError("username required")',
+        comment="Validate input.",
+    )
+
+    [comment] = _build_inline_comments(
+        [suggestion], fetched_files={"demo.py"}, commentable_lines={"demo.py": _GET_USER_LINES}
+    )
+
+    assert comment["line"] == 2 and "start_line" not in comment
+
+
+def test_build_inline_comments_honors_explicit_end_line():
+    suggestion = InlineSuggestion(
+        file_path="demo.py",
+        line=2,
+        end_line=3,
+        suggested_code="    return conn.execute(\"SELECT * FROM users WHERE username = ?\", (username,)).fetchone()",
+        comment="Inline the parameterized query.",
+    )
+
+    [comment] = _build_inline_comments(
+        [suggestion], fetched_files={"demo.py"}, commentable_lines={"demo.py": _GET_USER_LINES}
+    )
+
+    assert (comment["start_line"], comment["line"]) == (2, 3)
+
+
+def test_build_inline_comments_drops_range_crossing_a_hunk_gap():
+    suggestion = InlineSuggestion(
+        file_path="demo.py", line=2, end_line=4, suggested_code="    pass", comment="Spans a gap."
+    )
+
+    assert (
+        _build_inline_comments(
+            [suggestion], fetched_files={"demo.py"}, commentable_lines={"demo.py": {2: "    a", 4: "    b"}}
         )
         == []
     )
