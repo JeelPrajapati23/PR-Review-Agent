@@ -543,8 +543,16 @@ def _build_inline_comments(
     resolved against the diff. Surviving suggestions get the target line's
     original indentation restored (see _restore_indentation), and span every
     line they replace (see _replaced_line_range).
+
+    Both specialists often propose the same fix for the same lines (seen
+    live: two identical suggestion comments on one PR), and two suggestions
+    over overlapping lines can't both be applied anyway -- so any suggestion
+    overlapping one already kept for that file is dropped. suggestions lists
+    the Security Warden's fixes first, so this favors security on conflict,
+    same as the Synthesizer's own tie-break.
     """
     comments = []
+    kept_ranges: dict[str, list[tuple[int, int]]] = {}
     for suggestion in suggestions:
         basename = Path(suggestion.file_path).name.lower()
         if basename not in fetched_files:
@@ -568,6 +576,10 @@ def _build_inline_comments(
         # A range crossing a gap between hunks isn't commentable as one block.
         if any(n not in file_lines for n in range(start, end + 1)):
             continue
+        ranges = kept_ranges.setdefault(resolved_path, [])
+        if any(start <= kept_end and kept_start <= end for kept_start, kept_end in ranges):
+            continue
+        ranges.append((start, end))
 
         comment = {"path": resolved_path, "line": end, "side": "RIGHT", "body": _format_suggestion_body(suggestion)}
         if end > start:

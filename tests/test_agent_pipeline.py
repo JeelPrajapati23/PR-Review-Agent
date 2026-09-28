@@ -311,6 +311,24 @@ def test_build_inline_comments_honors_explicit_end_line():
     assert (comment["start_line"], comment["line"]) == (2, 3)
 
 
+def test_build_inline_comments_drops_overlapping_duplicate_suggestions():
+    # Real shape from a live PR: both specialists proposed the same 2-3 fix,
+    # and both were posted. The first (Security Warden's) must win; a fix on
+    # a separate, non-overlapping line must survive.
+    code = '    query = "SELECT * FROM orders WHERE id = ?"\n    return conn.execute(query, (order_id,)).fetchone()'
+    security_fix = InlineSuggestion(file_path="demo.py", line=2, suggested_code=code, comment="Security fix.")
+    performance_fix = InlineSuggestion(file_path="demo.py", line=3, suggested_code="    return None", comment="Overlaps.")
+    separate_fix = InlineSuggestion(file_path="demo.py", line=6, suggested_code="# removed", comment="Separate.")
+
+    comments = _build_inline_comments(
+        [security_fix, performance_fix, separate_fix],
+        fetched_files={"demo.py"},
+        commentable_lines={"demo.py": _GET_USER_LINES},
+    )
+
+    assert [c["body"].split("\n")[0] for c in comments] == ["Security fix.", "Separate."]
+
+
 def test_build_inline_comments_drops_range_crossing_a_hunk_gap():
     suggestion = InlineSuggestion(
         file_path="demo.py", line=2, end_line=4, suggested_code="    pass", comment="Spans a gap."
