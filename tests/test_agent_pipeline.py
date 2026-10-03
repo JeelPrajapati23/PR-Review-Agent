@@ -9,6 +9,8 @@ from app.agent import (
     ReviewOutput,
     SpecialistFindings,
     _build_inline_comments,
+    _merge_batch_outcomes,
+    _plan_batches,
     _restore_indentation,
     _build_panel_graph,
     _combine_fetched_files,
@@ -16,7 +18,7 @@ from app.agent import (
     _format_review,
     _is_grounded,
 )
-from mcp_servers.code_server import scan_local_dependencies
+from mcp_servers.code_server import fetch_file_contents, scan_local_dependencies
 
 # ---------------------------------------------------------------------------
 # 1. scan_local_dependencies (AST parsing / import resolution)
@@ -101,7 +103,7 @@ def test_fetched_file_names_ignores_non_fetch_tool_calls():
 
 def test_combine_fetched_files_includes_diff_shown_files_without_a_fetch_call():
     # No fetch_file_contents call at all -- the file was reviewed via its
-    # diff, embedded directly in the task message (see _build_task_message).
+    # diff, embedded directly in the task message (see _build_task_messages).
     messages = [AIMessage(content="Reviewed the diff, no issues found.")]
 
     assert _combine_fetched_files(messages, ["main.py"]) == {"main.py"}
@@ -370,7 +372,7 @@ def test_panel_graph_runs_sequential_topology_and_populates_state():
     )
 
     async def fake_run_specialist(
-        persona_key, _prompt, _tools, _checkpointer, _base_thread_id, _task_message, _target_files, _diff_shown_files
+        persona_key, _prompt, _tools, _checkpointer, _base_thread_id, _task_messages, _target_files, _diff_shown_files
     ):
         call_order.append(persona_key)
         if persona_key == "security":
@@ -419,7 +421,7 @@ def test_panel_graph_runs_sequential_topology_and_populates_state():
     async def _run():
         graph = _build_panel_graph(tools, checkpointer, "test-thread")
         return await graph.ainvoke(
-            {"task_message": "Review PR #1", "target_files": ["app/main.py"], "diff_shown_files": []},
+            {"task_messages": ["Review PR #1"], "target_files": ["app/main.py"], "diff_shown_files": []},
             config={"configurable": {"thread_id": "test-thread"}},
         )
 
@@ -448,3 +450,136 @@ def test_panel_graph_runs_sequential_topology_and_populates_state():
     assert final_review.summary == "Reviewed app/main.py."
     assert final_review.performance_observations == "O(n^2) loop in app/main.py."
     assert final_review.security_correctness_issues == "Missing input validation in app/main.py."
+
+
+def test_panel_graph_parallel_runs_specialists_concurrently_then_synthesizes_once():
+    # Each fake specialist waits for the other to have started. Under the
+    # sequential topology this would time out; it only completes if both
+    # are genuinely in flight at the same time.
+    started = {"security": asyncio.Event(), "performance": asyncio.Event()}
+    synth_calls: list[tuple] = []
+
+    async def fake_run_specialist(
+        persona_key, _prompt, _tools, _checkpointer, _base_thread_id, _task_messages, _target_files, _diff_shown_files
+    ):
+        started[persona_key].set()
+        other = "performance" if persona_key == "security" else "security"
+        await asyncio.wait_for(started[other].wait(), timeout=2)
+        return {
+            "findings": SpecialistFindings(
+                findings=f"{persona_key} issue in app/main.py",
+                validation_notes="None found.",
+                suggested_fixes=[],
+            ),
+            "fetched_files": ["main.py"],
+            "circuit_broken": False,
+            "last_message": f"{persona_key} done",
+        }
+
+    async def fake_synthesize(security, performance):
+        synth_calls.append((security, performance))
+        return ReviewOutput(
+            summary="Reviewed app/main.py.",
+            performance_observations="None found.",
+            edge_cases="None found.",
+            security_correctness_issues="None found.",
+            architectural_suggestions="None found.",
+            validation_outcome="None found.",
+        )
+
+    tools = [_StubTool("fetch_file_contents")]
+
+    async def _run():
+        graph = _build_panel_graph(tools, MemorySaver(), "test-thread", parallel=True)
+        return await graph.ainvoke(
+            {"task_messages": ["Review PR #1"], "target_files": ["app/main.py"], "diff_shown_files": []},
+            config={"configurable": {"thread_id": "test-thread"}},
+        )
+
+    with patch("app.agent._run_specialist", side_effect=fake_run_specialist), patch(
+        "app.agent._synthesize", side_effect=fake_synthesize
+    ):
+        result = asyncio.run(_run())
+
+    # Synthesizer joins both branches: called exactly once, with both reports.
+    assert len(synth_calls) == 1
+    security, performance = synth_calls[0]
+    assert security.findings == "security issue in app/main.py"
+    assert performance.findings == "performance issue in app/main.py"
+    assert result["final_review"] is not None
+
+
+# ---------------------------------------------------------------------------
+# 4. Splitting a large PR into batches that fit the per-minute token limit
+# ---------------------------------------------------------------------------
+
+
+def _patch_with_lines(count: int, start: int = 1) -> str:
+    body = "\n".join(f"+line_{i} = compute_something_long({i})" for i in range(start, start + count))
+    return f"@@ -0,0 +{start},{count} @@\n{body}"
+
+
+def test_plan_batches_keeps_small_pr_in_one_batch():
+    patches = {"a.py": _patch_with_lines(5), "b.py": _patch_with_lines(5)}
+    batches = _plan_batches(["a.py", "b.py"], [], patches, budget_tokens=1500)
+    assert len(batches) == 1
+    assert [block.splitlines()[0] for block in batches[0][0]] == ["### a.py", "### b.py"]
+
+
+def test_plan_batches_splits_across_files_and_within_an_oversized_diff():
+    patches = {"big.py": _patch_with_lines(400), "small.py": _patch_with_lines(5)}
+    batches = _plan_batches(["big.py", "small.py"], ["huge.bin"], patches, budget_tokens=1500)
+    diff_blocks = [block for blocks, _ in batches for block in blocks]
+    parts = [block for block in diff_blocks if block.startswith("### big.py (part ")]
+    assert len(parts) > 1
+    # Every line of the big diff appears exactly once, with its real line number.
+    rendered_numbers = [
+        line.split("|")[0].strip() for block in parts for line in block.splitlines()[1:] if "|" in line
+    ]
+    assert rendered_numbers == [str(i) for i in range(1, 401)]
+    # A non-diffable file always gets a batch of its own.
+    assert batches[-1] == ([], ["huge.bin"])
+
+
+def test_merge_batch_outcomes_combines_reports_and_flags_missing_batches():
+    fix_a = InlineSuggestion(file_path="a.py", line=1, suggested_code="x", comment="a")
+    fix_b = InlineSuggestion(file_path="b.py", line=2, suggested_code="y", comment="b")
+    outcomes = [
+        {
+            "findings": SpecialistFindings(findings="Bug in a.py", validation_notes="Suite passes.", suggested_fixes=[fix_a]),
+            "fetched_files": ["a.py"],
+            "circuit_broken": False,
+            "last_message": "1",
+        },
+        {
+            "findings": SpecialistFindings(findings="None found.", validation_notes="Suite passes.", suggested_fixes=[]),
+            "fetched_files": ["c.py"],
+            "circuit_broken": False,
+            "last_message": "2",
+        },
+        {"findings": None, "fetched_files": [], "circuit_broken": False, "last_message": "3"},
+        {
+            "findings": SpecialistFindings(findings="Leak in b.py", validation_notes="None found.", suggested_fixes=[fix_b]),
+            "fetched_files": ["b.py"],
+            "circuit_broken": False,
+            "last_message": "4",
+        },
+    ]
+    merged = _merge_batch_outcomes(outcomes)
+    findings = merged["findings"]
+    assert findings.findings.startswith("Bug in a.py\n\nLeak in b.py")
+    assert "batch(es) 3 of 4 produced no report" in findings.findings
+    assert findings.validation_notes == "Suite passes."
+    assert findings.suggested_fixes == [fix_a, fix_b]
+    assert merged["fetched_files"] == ["a.py", "b.py", "c.py"]
+    assert merged["last_message"] == "4"
+
+
+def test_fetch_file_contents_reads_a_line_range_with_real_numbers(tmp_path):
+    (tmp_path / "mod.py").write_text("\n".join(f"line {i}" for i in range(1, 21)))
+    out = fetch_file_contents(str(tmp_path), "mod.py", start_line=5, end_line=7)
+    # Width still padded to the whole file's line count, same as a full read.
+    assert out.splitlines() == [" 5 | line 5", " 6 | line 6", " 7 | line 7", "[lines 5-7 of 20]"]
+    assert fetch_file_contents(str(tmp_path), "mod.py", start_line=30).startswith("Error:")
+    full = fetch_file_contents(str(tmp_path), "mod.py")
+    assert full.splitlines()[0] == " 1 | line 1" and "[lines" not in full

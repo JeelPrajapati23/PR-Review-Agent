@@ -106,8 +106,9 @@ def reset_daily_usage() -> None:
         logger.exception("Failed to reset today's Groq usage telemetry in Redis")
 
 
-def check_budget_ok(model: str, safe_limit: int = 90_000) -> bool:
-    """True if today's total Groq token usage is still under safe_limit.
+def check_budget_ok(model: str, safe_limit: int | None = None) -> bool:
+    """True if today's total Groq token usage is still under safe_limit
+    (default: Settings.groq_daily_token_budget).
 
     Note: the usage keys aren't dimensioned by model (see record_usage) --
     every Groq call in this system currently draws from one shared daily
@@ -119,6 +120,8 @@ def check_budget_ok(model: str, safe_limit: int = 90_000) -> bool:
     OK) rather than blocking every review over a telemetry outage -- the
     same fail-open philosophy record_usage applies in the other direction.
     """
+    if safe_limit is None:
+        safe_limit = get_settings().groq_daily_token_budget
     today = datetime.now(timezone.utc).date().isoformat()
     prompt_key = f"usage:groq:prompt_tokens:{today}"
     completion_key = f"usage:groq:completion_tokens:{today}"

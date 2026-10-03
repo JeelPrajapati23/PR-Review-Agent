@@ -6,7 +6,6 @@ from typing import NotRequired, TypedDict
 
 from groq import APIConnectionError, APITimeoutError, RateLimitError
 from langchain_core.messages import AIMessage
-from langchain_groq import ChatGroq
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.checkpoint.redis import AsyncRedisSaver
 from langgraph.graph import END, START, StateGraph
@@ -16,6 +15,7 @@ from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
+from app.groq_pool import MIN_OUTPUT_TOKENS, GroqPoolExhausted, RotatingChatGroq, estimate_tokens, get_pool
 from app.github_client import (
     GitHubNotifyError,
     format_diff_for_review,
@@ -354,7 +354,8 @@ class PanelState(TypedDict):
     without an InvalidUpdateError.
     """
 
-    task_message: str
+    # One task message per batch of the PR's files (see _build_task_messages).
+    task_messages: list[str]
     target_files: list[str]
     diff_shown_files: list[str]
     security_findings: NotRequired[SpecialistFindings | None]
@@ -628,33 +629,73 @@ def _build_mcp_client() -> MultiServerMCPClient:
     )
 
 
+def _groq_model(role: str) -> RotatingChatGroq:
+    """A ChatGroq bound to one panel role's key pool (see app/groq_pool.py)."""
+    settings = get_settings()
+    pool = get_pool(
+        role,
+        settings.groq_key_pool(role),
+        settings.groq_tpm_limit,
+        settings.groq_max_rate_limit_wait_seconds,
+    )
+    return RotatingChatGroq.from_pool(pool, model=settings.groq_model, temperature=0.1, max_tokens=4000)
+
+
+def _join_reports(texts: list[str]) -> str:
+    real = [text.strip() for text in texts if text.strip() and text.strip().lower().rstrip(".") != "none found"]
+    if real:
+        return "\n\n".join(dict.fromkeys(real))
+    return texts[0] if texts else "None found."
+
+
+def _merge_batch_outcomes(outcomes: list[dict]) -> dict:
+    """Fold one specialist's per-batch results into a single report."""
+    if len(outcomes) == 1:
+        return outcomes[0]
+    reports = [outcome["findings"] for outcome in outcomes if outcome["findings"] is not None]
+    merged = None
+    if reports:
+        findings = _join_reports([report.findings for report in reports])
+        missing = [str(i) for i, outcome in enumerate(outcomes, start=1) if outcome["findings"] is None]
+        if missing:
+            findings += (
+                f"\n\nNote: batch(es) {', '.join(missing)} of {len(outcomes)} produced no report, so the "
+                "files in them were not reviewed by this specialist."
+            )
+        merged = SpecialistFindings(
+            findings=findings,
+            validation_notes=_join_reports([report.validation_notes for report in reports]),
+            suggested_fixes=[fix for report in reports for fix in report.suggested_fixes],
+        )
+    return {
+        "findings": merged,
+        "fetched_files": sorted({name for outcome in outcomes for name in outcome["fetched_files"]}),
+        "circuit_broken": any(outcome["circuit_broken"] for outcome in outcomes),
+        "last_message": outcomes[-1]["last_message"],
+    }
+
+
 async def _run_specialist(
     persona_key: str,
     prompt: str,
     tools: list,
     checkpointer: AsyncRedisSaver,
     base_thread_id: str,
-    task_message: str,
+    task_messages: list[str],
     target_files: list[str],
     diff_shown_files: list[str],
 ) -> dict:
-    """Run one specialist persona's own ReAct sub-agent to completion.
+    """Run one specialist persona's own ReAct sub-agent over every batch.
 
-    Each specialist is its own compiled graph with its own Redis checkpoint
-    thread (base_thread_id suffixed with the persona key), so its internal
-    tool-call history is durable independently of the panel's own state.
+    Each batch gets its own Redis checkpoint thread (base_thread_id suffixed
+    with the persona key, plus the batch number when there's more than one),
+    so its tool-call history is durable independently of the panel's state
+    and a retry resumes only the batches that hadn't finished.
     """
     specialist_tools = [tool for tool in tools if tool.name in _SPECIALIST_TOOL_NAMES]
     settings = get_settings()
-    model = ChatGroq(
-        model=settings.groq_model,
-        api_key=settings.groq_api_key,
-        temperature=0.1,
-        max_tokens=4000,
-        max_retries=2,
-    )
     agent = create_react_agent(
-        model,
+        _groq_model(persona_key),
         specialist_tools,
         prompt=prompt,
         response_format=(SPECIALIST_STRUCTURED_PROMPT, SpecialistFindings),
@@ -662,23 +703,28 @@ async def _run_specialist(
         pre_model_hook=_stop_on_repeated_tool_errors,
         checkpointer=checkpointer,
     )
-    result = await agent.ainvoke(
-        {"messages": [("user", task_message)], "target_files": target_files},
-        config={
-            "recursion_limit": 25,
-            "configurable": {"thread_id": f"{base_thread_id}:{persona_key}"},
-        },
-    )
-    messages = result["messages"]
-    prompt_tokens, completion_tokens = _sum_usage_metadata(messages)
-    await record_usage(settings.groq_model, prompt_tokens, completion_tokens)
-    fetched_files = _combine_fetched_files(messages, diff_shown_files)
-    return {
-        "findings": result.get("structured_response"),
-        "fetched_files": sorted(fetched_files),
-        "circuit_broken": result.get("consecutive_tool_error_turns", 0) >= MAX_CONSECUTIVE_TOOL_ERROR_TURNS,
-        "last_message": messages[-1].content if messages else "",
-    }
+    outcomes = []
+    for index, task_message in enumerate(task_messages, start=1):
+        thread_id = f"{base_thread_id}:{persona_key}"
+        if len(task_messages) > 1:
+            thread_id += f":batch{index}"
+        result = await agent.ainvoke(
+            {"messages": [("user", task_message)], "target_files": target_files},
+            config={"recursion_limit": 25, "configurable": {"thread_id": thread_id}},
+        )
+        messages = result["messages"]
+        prompt_tokens, completion_tokens = _sum_usage_metadata(messages)
+        await record_usage(settings.groq_model, prompt_tokens, completion_tokens)
+        outcome = {
+            "findings": result.get("structured_response"),
+            "fetched_files": sorted(_combine_fetched_files(messages, diff_shown_files)),
+            "circuit_broken": result.get("consecutive_tool_error_turns", 0) >= MAX_CONSECUTIVE_TOOL_ERROR_TURNS,
+            "last_message": messages[-1].content if messages else "",
+        }
+        outcomes.append(outcome)
+        if outcome["circuit_broken"]:
+            break
+    return _merge_batch_outcomes(outcomes)
 
 
 def _findings_block(label: str, findings: SpecialistFindings | None) -> str:
@@ -693,13 +739,7 @@ async def _synthesize(security: SpecialistFindings | None, performance: Speciali
     reconciles text the specialists already produced.
     """
     settings = get_settings()
-    model = ChatGroq(
-        model=settings.groq_model,
-        api_key=settings.groq_api_key,
-        temperature=0.1,
-        max_tokens=4000,
-        max_retries=2,
-    )
+    model = _groq_model("synthesizer")
     panel_report = (
         _findings_block("Security Warden Report", security)
         + "\n\n"
@@ -718,13 +758,16 @@ async def _synthesize(security: SpecialistFindings | None, performance: Speciali
     return response.get("parsed")
 
 
-def _build_panel_graph(tools: list, checkpointer: AsyncRedisSaver, base_thread_id: str):
-    """Sequential supervisor graph: security_warden runs, then
-    performance_architect, then the Synthesizer. The two specialists don't
-    depend on each other's output -- this ordering exists purely to keep
-    peak per-minute token usage against the Groq API to one specialist call
-    at a time instead of two concurrent ones, since the free-tier TPM limit
-    can't absorb both firing at once.
+def _build_panel_graph(tools: list, checkpointer: AsyncRedisSaver, base_thread_id: str, parallel: bool = False):
+    """Supervisor graph: security_warden and performance_architect, then the
+    Synthesizer. The two specialists don't depend on each other's output.
+
+    parallel=False runs them sequentially, keeping peak per-minute usage to
+    one specialist at a time -- needed when both share one Groq key, since
+    the free-tier TPM limit can't absorb both firing at once. parallel=True
+    fans both out from START and joins at the synthesizer; only safe when
+    each specialist has its own Groq account key (see
+    Settings.specialists_run_in_parallel).
     """
 
     async def security_node(state: PanelState) -> dict:
@@ -734,7 +777,7 @@ def _build_panel_graph(tools: list, checkpointer: AsyncRedisSaver, base_thread_i
             tools,
             checkpointer,
             base_thread_id,
-            state["task_message"],
+            state["task_messages"],
             state["target_files"],
             state["diff_shown_files"],
         )
@@ -752,7 +795,7 @@ def _build_panel_graph(tools: list, checkpointer: AsyncRedisSaver, base_thread_i
             tools,
             checkpointer,
             base_thread_id,
-            state["task_message"],
+            state["task_messages"],
             state["target_files"],
             state["diff_shown_files"],
         )
@@ -779,58 +822,148 @@ def _build_panel_graph(tools: list, checkpointer: AsyncRedisSaver, base_thread_i
     graph.add_node("security_warden", security_node)
     graph.add_node("performance_architect", performance_node)
     graph.add_node("synthesizer", synthesizer_node)
-    graph.add_edge(START, "security_warden")
-    graph.add_edge("security_warden", "performance_architect")
-    graph.add_edge("performance_architect", "synthesizer")
+    if parallel:
+        graph.add_edge(START, "security_warden")
+        graph.add_edge(START, "performance_architect")
+        # List form waits for both before the synthesizer runs. On a crash,
+        # the checkpointer keeps the finished specialist's pending write, so
+        # a retry only re-runs the one that failed.
+        graph.add_edge(["security_warden", "performance_architect"], "synthesizer")
+    else:
+        graph.add_edge(START, "security_warden")
+        graph.add_edge("security_warden", "performance_architect")
+        graph.add_edge("performance_architect", "synthesizer")
     graph.add_edge("synthesizer", END)
     return graph.compile(checkpointer=checkpointer)
 
 
-def _build_task_message(
+# Per-batch room for diffs, out of one key's per-minute budget: what's left
+# after the persona prompt, tool schemas, a minimum answer, and headroom for
+# the tool results the specialist pulls in while reviewing.
+_TOOL_SCHEMA_TOKENS = 700
+_TOOL_RESULT_HEADROOM_TOKENS = 1500
+_MIN_BATCH_DIFF_TOKENS = 800
+
+
+def _batch_diff_budget_tokens(tpm_limit: int) -> int:
+    persona_tokens = estimate_tokens(max(len(SECURITY_WARDEN_PROMPT), len(PERFORMANCE_ARCHITECT_PROMPT)))
+    available = (
+        int(tpm_limit * 0.9)
+        - persona_tokens
+        - _TOOL_SCHEMA_TOKENS
+        - MIN_OUTPUT_TOKENS
+        - _TOOL_RESULT_HEADROOM_TOKENS
+    )
+    return max(available, _MIN_BATCH_DIFF_TOKENS)
+
+
+def _split_rendered_diff(file_path: str, rendered: str, budget_tokens: int) -> list[str]:
+    """One "### path" block per piece, splitting a diff too big for a single
+    batch on line boundaries. Every line carries its own new-file number, so
+    a piece needs no extra context to anchor a suggestion."""
+    block = f"### {file_path}\n{rendered}"
+    if estimate_tokens(len(block)) <= budget_tokens:
+        return [block]
+    pieces, current, current_tokens = [], [], 0
+    for line in rendered.splitlines():
+        line_tokens = estimate_tokens(len(line) + 1)
+        if current and current_tokens + line_tokens > budget_tokens:
+            pieces.append(current)
+            current, current_tokens = [], 0
+        current.append(line)
+        current_tokens += line_tokens
+    if current:
+        pieces.append(current)
+    return [
+        f"### {file_path} (part {i}/{len(pieces)})\n" + "\n".join(piece)
+        for i, piece in enumerate(pieces, start=1)
+    ]
+
+
+def _plan_batches(
+    diffed_files: list[str], full_fetch_files: list[str], file_patches: dict[str, str], budget_tokens: int
+) -> list[tuple[list[str], list[str]]]:
+    """Greedily pack diff blocks into batches that each fit budget_tokens.
+
+    Files GitHub couldn't diff are large or binary by definition, so each
+    gets a batch of its own rather than sharing one with diffs.
+    """
+    batches: list[tuple[list[str], list[str]]] = []
+    current: list[str] = []
+    current_tokens = 0
+    for file_path in diffed_files:
+        for block in _split_rendered_diff(file_path, format_diff_for_review(file_patches[file_path]), budget_tokens):
+            block_tokens = estimate_tokens(len(block))
+            if current and current_tokens + block_tokens > budget_tokens:
+                batches.append((current, []))
+                current, current_tokens = [], 0
+            current.append(block)
+            current_tokens += block_tokens
+    if current:
+        batches.append((current, []))
+    batches.extend(([], [file_path]) for file_path in full_fetch_files)
+    return batches or [([], [])]
+
+
+def _build_task_messages(
     pr_number: int,
     repository: str,
     pull_request: dict,
     repo_path: Path,
     target_files: list[str],
     file_patches: dict[str, str],
-) -> tuple[str, list[str]]:
-    """Build the specialists' initial task message and the list of target-file
-    basenames whose diff was embedded directly in it (diff_shown_files).
+) -> tuple[list[str], list[str]]:
+    """Build the specialists' task messages -- one per batch -- and the list
+    of target-file basenames whose diff was embedded directly (diff_shown_files).
 
-    target_files not present in file_patches (GitHub couldn't diff them --
-    too large or binary) are listed separately as files to fetch in full via
-    fetch_file_contents.
+    A PR whose diffs won't fit in one request under the per-minute token
+    limit is split into batches, each reviewed as its own ReAct run and
+    merged afterwards (_merge_batch_outcomes). target_files not present in
+    file_patches (GitHub couldn't diff them -- too large or binary) are
+    listed as files to fetch via fetch_file_contents.
     """
     diffed_files = [f for f in target_files if file_patches.get(f)]
     full_fetch_files = [f for f in target_files if not file_patches.get(f)]
+    batches = _plan_batches(
+        diffed_files, full_fetch_files, file_patches, _batch_diff_budget_tokens(get_settings().groq_tpm_limit)
+    )
 
-    sections = [
+    header = [
         f"Review PR #{pr_number} in repository {repository}.",
         f"Title: {pull_request['title']}",
         f"Branch: {pull_request['head']['ref']}",
         f"repo_path to use for all tool calls: {repo_path}",
     ]
-
-    if diffed_files:
-        diff_blocks = "\n\n".join(
-            f"### {file_path}\n{format_diff_for_review(file_patches[file_path])}" for file_path in diffed_files
-        )
-        sections.append(
-            "DIFFS (shown below -- review directly; call fetch_file_contents on the same file "
-            "only if you need to see code outside these hunks to judge correctness):\n" + diff_blocks
-        )
-
-    if full_fetch_files:
-        sections.append(
-            "FILES REQUIRING FULL FETCH (no diff available -- call fetch_file_contents on each "
-            f"before reviewing): {full_fetch_files}"
-        )
-
-    sections.append("Begin your review now.")
-    task_message = "\n\n".join(sections)
+    task_messages = []
+    for index, (diff_blocks, fetch_files) in enumerate(batches, start=1):
+        sections = list(header)
+        if len(batches) > 1:
+            sections.append(
+                f"BATCH {index}/{len(batches)}: this PR is too large to review in one request under the "
+                f"API's per-minute token limit, so it is split into {len(batches)} batches. Review ONLY the "
+                "diffs/files in this batch -- the other batches cover the rest, and all batch reports are "
+                f"merged afterwards. Every file this PR changes, for context: {target_files}. The test suite "
+                "is the same in every batch, so after batch 1 only call run_validation_suite if a finding in "
+                "this batch specifically depends on it."
+            )
+        if diff_blocks:
+            sections.append(
+                "DIFFS (shown below -- review directly; call fetch_file_contents on the same file "
+                "only if you need to see code outside these hunks to judge correctness):\n"
+                + "\n\n".join(diff_blocks)
+            )
+        if fetch_files:
+            sections.append(
+                "FILES REQUIRING FULL FETCH (no diff available -- call fetch_file_contents on each "
+                f"before reviewing): {fetch_files}. These are typically large: read them in ranges of "
+                "about 150 lines using fetch_file_contents' start_line/end_line arguments rather than "
+                "all at once."
+            )
+        sections.append("Begin your review now.")
+        task_messages.append("\n\n".join(sections))
 
     diff_shown_files = sorted({Path(f).name.lower() for f in diffed_files})
-    return task_message, diff_shown_files
+    return task_messages, diff_shown_files
 
 
 async def run_pr_review_agent(pr_metadata: dict, repo_path: Path) -> dict:
@@ -848,7 +981,7 @@ async def run_pr_review_agent(pr_metadata: dict, repo_path: Path) -> dict:
         ))
         file_patches = pull_request.get("file_patches", {})
 
-        task_message, diff_shown_files = _build_task_message(
+        task_messages, diff_shown_files = _build_task_messages(
             pr_number, repository, pull_request, repo_path, target_files, file_patches
         )
 
@@ -861,10 +994,10 @@ async def run_pr_review_agent(pr_metadata: dict, repo_path: Path) -> dict:
         settings = get_settings()
         async with AsyncRedisSaver.from_conn_string(settings.redis_url) as checkpointer:
             await checkpointer.asetup()
-            panel = _build_panel_graph(tools, checkpointer, base_thread_id)
+            panel = _build_panel_graph(tools, checkpointer, base_thread_id, settings.specialists_run_in_parallel)
 
             panel_result = await panel.ainvoke(
-                {"task_message": task_message, "target_files": target_files, "diff_shown_files": diff_shown_files},
+                {"task_messages": task_messages, "target_files": target_files, "diff_shown_files": diff_shown_files},
                 config={
                     "recursion_limit": 25,
                     "configurable": {"thread_id": base_thread_id},
@@ -926,7 +1059,7 @@ async def run_pr_review_agent(pr_metadata: dict, repo_path: Path) -> dict:
             "status": status,
             "summary": summary_text,
         }
-    except (RateLimitError, APIConnectionError, APITimeoutError):
+    except (RateLimitError, APIConnectionError, APITimeoutError, GroqPoolExhausted):
         # Re-raise past this handler so Celery's autoretry_for on
         # process_pr_review_task can back off and retry, instead of this
         # transient failure being swallowed into an "error" status below.

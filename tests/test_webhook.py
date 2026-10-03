@@ -181,5 +181,5 @@ def test_webhook_locks_on_repo_pr_and_sha(mock_delay, _mock_redis_lock):
     )
 
     _mock_redis_lock.set.assert_called_once_with(
-        "lock:review:octocat/pr-review-agent:42:abc123", "1", nx=True, ex=15 * 60
+        "lock:review:octocat/pr-review-agent:42:abc123", "1", nx=True, ex=60 * 60
     )

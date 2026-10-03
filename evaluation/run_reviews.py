@@ -72,6 +72,7 @@ from groq import APIConnectionError, APITimeoutError, RateLimitError
 
 from app.agent import run_pr_review_agent
 from app.config import get_settings
+from app.groq_pool import GroqPoolExhausted
 from app.telemetry import _get_sync_redis_client, check_budget_ok, reset_daily_usage
 
 DATASET_ROOT = Path(__file__).resolve().parent
@@ -368,7 +369,7 @@ def main() -> None:
             started_iso = datetime.now(timezone.utc).isoformat()
             try:
                 agent_result = asyncio.run(run_pr_review_agent(pr_metadata, fixture_dir))
-            except (RateLimitError, APIConnectionError, APITimeoutError) as exc:
+            except (RateLimitError, APIConnectionError, APITimeoutError, GroqPoolExhausted) as exc:
                 # A real Groq rate-limit/connection failure mid-review -- try
                 # the next rotation key (if any) on the same fixture before
                 # giving up on the whole run.

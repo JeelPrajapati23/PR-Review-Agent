@@ -30,7 +30,9 @@ _PROCESSABLE_ACTIONS = {"opened", "synchronize"}
 # block a legitimate re-review of the same commit, while still covering the
 # burst of near-simultaneous redeliveries GitHub sends when this endpoint is
 # briefly slow to respond.
-_DEDUP_LOCK_TTL_SECONDS = 15 * 60
+# Outlives app/tasks.py's 45-minute review timeout, so a redelivery can't
+# queue a duplicate while the first review is still waiting out rate limits.
+_DEDUP_LOCK_TTL_SECONDS = 60 * 60
 
 # Real GitHub PR webhook payloads are well under 1MB even for large PRs (the
 # body carries metadata only, never diffs/file contents). This endpoint is

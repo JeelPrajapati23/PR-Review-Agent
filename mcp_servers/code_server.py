@@ -53,7 +53,9 @@ def list_repo_files(repo_path: str) -> str:
 
 
 @mcp.tool()
-def fetch_file_contents(repo_path: str, file_path: str) -> str:
+def fetch_file_contents(
+    repo_path: str, file_path: str, start_line: int | None = None, end_line: int | None = None
+) -> str:
     """Read and return the text contents of file_path relative to repo_path,
     with each line prefixed by its 1-indexed line number (format: 'N | code').
 
@@ -70,6 +72,10 @@ def fetch_file_contents(repo_path: str, file_path: str) -> str:
     Returns an explicit "Error: ..." string instead of raising if repo_path
     doesn't exist, file_path escapes the repo root, the file is missing, or
     it can't be read (e.g. permissions, or it's a directory) or decoded.
+
+    start_line/end_line (1-indexed, inclusive, both optional) return just
+    that range with each line's real line number, so a large file can be
+    read in pieces that fit a per-minute token budget.
     """
     try:
         target = _resolve_within_repo(repo_path, file_path)
@@ -87,8 +93,15 @@ def fetch_file_contents(repo_path: str, file_path: str) -> str:
     lines = str(match).splitlines()
     if not lines:
         return ""
+    first = max(start_line or 1, 1)
+    last = min(end_line or len(lines), len(lines))
+    if first > last:
+        return f"Error: line range {start_line}-{end_line} is outside '{file_path}', which has {len(lines)} lines"
     width = len(str(len(lines)))
-    return "\n".join(f"{i:>{width}} | {line}" for i, line in enumerate(lines, start=1))
+    numbered = "\n".join(f"{i:>{width}} | {lines[i - 1]}" for i in range(first, last + 1))
+    if first > 1 or last < len(lines):
+        numbered += f"\n[lines {first}-{last} of {len(lines)}]"
+    return numbered
 
 
 def _read_text_best_effort(path: Path) -> str | None:

@@ -6,6 +6,7 @@ from groq import APIConnectionError, APITimeoutError, RateLimitError
 
 from app.agent import run_pr_review_agent
 from app.config import get_settings
+from app.groq_pool import GroqPoolExhausted
 from app.git_ops import GitCheckoutError, ensure_repo_checkout
 from app.github_client import GitHubNotifyError, list_changed_files, set_commit_status
 from app.telemetry import check_budget_ok
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 # uncaught AttributeError, etc.) should fail the task on turn 1 so it shows
 # up in tracking immediately instead of being masked behind a 3x exponential
 # backoff loop that can't fix it anyway.
-_TRANSIENT_GROQ_ERRORS = (RateLimitError, APIConnectionError, APITimeoutError)
+_TRANSIENT_GROQ_ERRORS = (RateLimitError, APIConnectionError, APITimeoutError, GroqPoolExhausted)
 
 # Upper bound on a single review panel run. Celery's own task_time_limit/
 # task_soft_time_limit are not enforced by the solo pool (`-P solo`,
@@ -28,7 +29,9 @@ _TRANSIENT_GROQ_ERRORS = (RateLimitError, APIConnectionError, APITimeoutError)
 # forever. Enforcing the bound here with asyncio.wait_for works regardless
 # of pool type. A TimeoutError here isn't one of _TRANSIENT_GROQ_ERRORS, so
 # it fails the task immediately rather than retrying a hang three more times.
-_AGENT_TIMEOUT_SECONDS = 10 * 60
+# Sized for a review that waits out several 429 cooldowns and runs its
+# files in multiple batches (see app/groq_pool.py), not one uninterrupted pass.
+_AGENT_TIMEOUT_SECONDS = 45 * 60
 
 
 def _notify_status(repository: str, sha: str, state: str, description: str, pr_number: int) -> None:
@@ -126,7 +129,7 @@ def process_pr_review_task(event_data: dict) -> dict:
     # so it shouldn't block a merge gated on this check the way a real
     # review failure should.
     settings = get_settings()
-    if not check_budget_ok(settings.groq_model):
+    if not check_budget_ok(settings.groq_model, settings.groq_daily_token_budget):
         logger.warning("Token Budget Exhausted: deferring review for %s#%s", repository, pr_number)
         _notify_status(
             repository,
